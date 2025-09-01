@@ -1,0 +1,13 @@
+[project]
+name = "dts_generation"
+version = "1.0.0"
+description = "A Python project for generating and comparing TypeScript .d.ts files for NPM packages."
+authors = [{name = "Leonardo Mieschendahl", email = "miesschendahl.leonardo@gmail.com"}]
+dependencies = ["easy_prompting @ git+https://github.com/TheoreticalCoder/EasyPrompting.git"]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+exclude = ["assets", "output"]
