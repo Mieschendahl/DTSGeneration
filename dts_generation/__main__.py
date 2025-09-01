@@ -5,7 +5,7 @@ import sys
 import traceback
 from typing import Optional
 from dts_generation._utils import create_dir, create_file, escape_package_name, shell, unescape_package_name
-from dts_generation._utils import build_tsd, build_definitely_typed
+from dts_generation._utils import build_dts, build_definitely_typed
 from dts_generation._generate_js import generate_examples
 from dts_generation._generate_dts import generate_declarations
 from dts_generation._compare_dts import compare_to_definitely_typed
@@ -13,9 +13,17 @@ import openai
 
 def run_from_commandline(
     output_path: str, model_name: str, temperature: int, interactive_llm: Optional[str], execution_timeout: int, dt_path: str, reproduce: bool, versions_path: Path,
-    tsd_path: str, package_name: Optional[str], dt_start: int, dt_end: int, remove_cache: str, no_readme_extraction: bool, simple_llm_generation: bool,
-    advanced_llm_generation: bool, no_example_generation: bool, no_declaration_generation: bool, no_comparison_generation: bool, no_cache: bool
+    dts_path: str, package_name: Optional[str], dt_start: int, dt_end: int, remove_cache: str, no_readme_extraction: bool, simple_llm_generation: bool,
+    advanced_llm_generation: bool, no_example_generation: bool, no_declaration_generation: bool, no_comparison_generation: bool, no_llm_cache: bool, build: bool
 ) -> None:
+    if build:
+        build_definitely_typed(Path(dt_path))
+        build_dts(Path(dts_path))
+        print("Finished building")
+        exit(0)
+    if not Path(dt_path).is_dir():
+        print("DefinitelyTyped repository was not found. Maybe you forgot to run --build first.")
+
     print("Checking required shell programs")
     versions = []
     versions.append(f"python: {sys.version}")
@@ -27,11 +35,6 @@ def run_from_commandline(
     versions.append(f"git: " + shell("git --version").value.strip())
     versions.append(f"docker: " + shell("docker --version").value.strip())
     create_file(Path(versions_path), content="\n".join(versions))
-
-    if dt_path is not None:
-        build_definitely_typed(Path(dt_path))
-    if tsd_path is not None:
-        build_tsd(Path(tsd_path))
 
     if package_name:
         print(f"\nRunning for a specific packge")
@@ -70,7 +73,7 @@ def run_from_commandline(
                     simple_llm_generation=simple_llm_generation,
                     advanced_llm_generation=advanced_llm_generation,
                     reproduce=reproduce,
-                    no_cache=no_cache
+                    no_llm_cache=no_llm_cache
                 )
 
             if not no_declaration_generation:
@@ -98,16 +101,21 @@ if __name__ == "__main__":
         description="Generate examples and d.ts files for an npm package and compare them to DefinitlyTyped d.ts files."
     )
     parser.add_argument(
+        "--build",
+        action="store_true",
+        help="Clones DefinitelyTyped and build dts-generate."
+    )
+    parser.add_argument(
         "--dt-path",
         metavar="PATH",
         default="./output/DefinitelyTyped",
-        help="Clones the DefinitelyTyped repository into P (default: ./output/DefinitelyTyped)"
+        help="Path to DefinitelyTyped(default: ./output/DefinitelyTyped)"
     )
     parser.add_argument(
-        "--tsd-path",
+        "--dts-path",
         metavar="PATH",
         default="./output/dts-generate",
-        help="Clones run-time-information-gathering and ts-declaration-file-generator repositories into P and builds their docker images (default: ./output/tsd-generator)"
+        help="Path to dts-generate (default: ./output/dts-generate)"
     )
     parser.add_argument(
         "--output-path",
@@ -201,8 +209,7 @@ if __name__ == "__main__":
         default=0,
         metavar="VALUE",
         help=(
-            "OpenAI model to use (default: gpt-4o-mini)."
-            " Common options: gpt-4o, gpt-4o-mini, gpt-4, gpt-4-turbo, gpt-3.5-turbo"
+            "The temperature that the model should use for completion generation (default: 0)"
         )
     )
     parser.add_argument(
@@ -211,7 +218,7 @@ if __name__ == "__main__":
         help="Make llm prompting interactive"
     )
     parser.add_argument(
-        "--no-cache",
+        "--no-llm-cache",
         action="store_true",
         help="Do not use LLM response caching"
     )
@@ -226,7 +233,7 @@ if __name__ == "__main__":
         advanced_llm_generation=args.advanced_llm_generation,
         execution_timeout=args.execution_timeout,
         dt_path=args.dt_path,
-        tsd_path=args.tsd_path,
+        dts_path=args.dts_path,
         package_name=args.package_name,
         dt_start=args.dt_start,
         dt_end=args.dt_end,
@@ -237,5 +244,6 @@ if __name__ == "__main__":
         no_declaration_generation=args.no_declaration_generation,
         no_comparison_generation=args.no_comparison_generation,
         versions_path=args.versions_path,
-        no_cache=args.no_cache
+        no_llm_cache=args.no_llm_cache,
+        build=args.build
     )

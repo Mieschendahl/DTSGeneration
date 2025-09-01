@@ -10,7 +10,7 @@ from dts_generation._utils import clone_package_repository, create_file, get_mai
 MAX_LINES = 20
 
 def generate_examples(model_name: str, temperature: int, interactive_llm, package_name: str, package_path: Path, execution_timeout: int,
-                      no_readme_extraction: bool, simple_llm_generation: bool, advanced_llm_generation: bool, reproduce: bool, no_cache: bool) -> None:        
+                      no_readme_extraction: bool, simple_llm_generation: bool, advanced_llm_generation: bool, reproduce: bool, no_llm_cache: bool) -> None:        
     examples_path = package_path / "examples"
     create_dir(examples_path)
     
@@ -138,18 +138,18 @@ def generate_examples(model_name: str, temperature: int, interactive_llm, packag
                     )
                 )
 
-    prompter = Prompter(
-            GPT(
-                model=model_name,
-                temperature=temperature
-            )
-        )\
-        .set_cache_path(None if no_cache else package_path / f"prompter/{model_name}")\
-        .set_interaction(interactive_llm)
-        
     ### SIMPLE LLM GENERATION ###
 
     if simple_llm_generation:
+        prompter = Prompter(
+                GPT(
+                    model=model_name,
+                    temperature=temperature
+                )
+            )\
+            .set_cache_path(None if no_llm_cache else package_path / f"prompter/{model_name}")\
+            .set_interaction(interactive_llm)
+    
         mode = "simple_llm_generation"
         try:
             examples_sub_path = examples_path / mode
@@ -252,6 +252,15 @@ def generate_examples(model_name: str, temperature: int, interactive_llm, packag
     # - Coverage agent still needs a way to access files for line / branch coverage, either autonomous or like how Rojus did
 
     if advanced_llm_generation:
+        prompter = Prompter(
+                GPT(
+                    model=model_name,
+                    temperature=temperature
+                )
+            )\
+            .set_cache_path(None if no_llm_cache else package_path / f"prompter/{model_name}")\
+            .set_interaction(interactive_llm)
+
         mode = "simple_llm_generation"
         try:
             examples_sub_path = examples_path / mode

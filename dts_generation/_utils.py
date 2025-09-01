@@ -204,30 +204,34 @@ def get_tests(repository_path: Path) -> list[dict[str, str]]:
     return [test for test in tests if test["content"]]
 
 def build_definitely_typed(clone_path: Path) -> None:
+    print("Bulding DefinitelyTyped")
     if clone_path.exists():
-        print(f"{clone_path} already exists. Skipping installation.")
+        print(f"{clone_path} already exists. Skipping clone.")
     else:
         create_dir(clone_path)
         shell(f"git clone --depth 1 https://github.com/DefinitelyTyped/DefinitelyTyped.git {clone_path.resolve()}")
 
-def build_tsd(tsd_path: Path) -> None:
+def build_dts(tsd_path: Path) -> None:
     project_name = "master-mind-wp3"
     clone_path = tsd_path / project_name
     repo_url = "https://github.com/Proglang-TypeScript/run-time-information-gathering.git"
+    print("Building master-mind-wp3")
     if clone_path.exists():
-        print(f"{clone_path} already exists. Skipping installation.")
+        print(f"{clone_path} already exists. Skipping clone.")
     else:
         create_dir(clone_path)
         shell(f"git clone --depth 1 {repo_url} {clone_path}")
-        shell(f"{clone_path}/build/build.sh", check=False)
-        print("...ingnoring test errors\n")
+    shell(f"{clone_path}/build/build.sh", check=False)
+    print("Building master-mind-wp3 completed successfully (test errors can be ignored)\n")
 
     project_name = "tsd-generator"
     clone_path = tsd_path / project_name
     repo_url = "https://github.com/Proglang-TypeScript/ts-declaration-file-generator.git"
+    print("Building tsd-generator")
     if clone_path.exists():
-        print(f"{clone_path} already exists. Skipping installation.")
+        print(f"{clone_path} already exists. Skipping clone.")
     else:
         create_dir(clone_path)
         shell(f"git clone --depth 1 {repo_url} {clone_path}")
-        shell(f"{clone_path}/build/build.sh")
+    shell(f"{clone_path}/build/build.sh")
+    print("Building tsd-generator completed successfully")
