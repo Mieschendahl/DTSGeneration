@@ -138,7 +138,7 @@ def generate_examples(
     llm_temperature: int,
     llm_verbose: bool,
     llm_interactive: bool,
-    llm_use_cache: bool
+    llm_use_cache: bool # Makes llm_temperature > 0 obsolete
 ) -> None:
     with printer(f"Generating examples:"):
         llm_verbose = llm_verbose or llm_interactive
@@ -310,7 +310,8 @@ def generate_examples(
                             f"Make sure that the example covers as much functionality of the package as possible.",
                             f"Make sure that the example does not import packages that are not installed by default, except \"{package_name}\".",
                             f"Make sure that the example does not run indefinitly, e.g. in case a server gets started.",
-                            f"Make sure that the example does not require user input."
+                            f"Make sure that the example does not require user input.",
+                            # f"Make sure that the example is written in ES5."
                         )
                     )
                     readable_logger.set_crop(MAX_NUM_MESSAGE_LINES)
@@ -353,7 +354,7 @@ def generate_examples(
                                         ),
                                         IItem(
                                             "example",
-                                            ICode(f"Provide the content of an example.")
+                                            ICode(f"Provide the content of an example.", "javascript")
                                         )
                                     )
                                 )[1]

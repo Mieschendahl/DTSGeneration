@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from dts_generation._utils import create_dir, create_file, shell, printer, escape_package_name
@@ -62,11 +63,8 @@ def generate_comparisons(
                         create_file(playground_path / "index.d.ts", declaration_path)
                         create_file(playground_path / "compare.ts", SCRIPTS_PATH / "compare.ts")
                         create_file(playground_path / "tsconfig.json", SCRIPTS_PATH / "tsconfig.json")
-                        create_file(playground_path / "prediction.d.ts", declaration_path)
-                        create_file(
-                            playground_path / "truth.d.ts",
-                            dt_declaration_path
-                        )
+                        create_file(playground_path / "predicted.d.ts", declaration_path)
+                        create_file(playground_path / "expected.d.ts", dt_declaration_path)
                         with printer(f"Comparing generated declaration to DefinitelyTyped declaration:"):
                             shell_output = shell(
                                 f"npx tsx compare.ts",
@@ -76,12 +74,18 @@ def generate_comparisons(
                                 verbose=verbose_execution
                             )
                             comparison_path = playground_path / "comparison.json"
-                            if shell_output.code or not comparison_path.is_file():
+                            if shell_output.code or not comparison_path.is_file() or not comparison_path.read_text():
                                 printer(f"Fail")
                                 continue
-                            printer(f"Success")
-                            # Saving generated comparison file
-                            create_file(comparisons_sub_path / declaration_path.name.replace("d.ts", "json"), comparison_path)
+                            comparison = comparison_path.read_text()
                             if verbose_files:
                                 with printer(f"Comparison content:"):
-                                    printer(comparison_path.read_text())
+                                    printer(comparison)
+                            printer(f"Success")
+                        stats = json.loads(comparison)
+                        with printer(f"Reading comparison results:"):
+                                printer(f"Soundness: {stats["soundness"]:.0%}")
+                                printer(f"Completeness: {stats["completeness"]:.0%}")
+                                printer(f"Equivalence: {stats["equivalence"]:.0%}")
+                        # Saving generated comparison file
+                        create_file(comparisons_sub_path / declaration_path.name.replace("d.ts", "json"), content=comparison)

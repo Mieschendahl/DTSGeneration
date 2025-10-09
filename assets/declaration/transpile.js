@@ -1,12 +1,3 @@
-#!/usr/bin/env node
-/* transpile-single.cjs
- * Transpiles a single .js/.mjs/.cjs file to ES5 CommonJS using Babel.
- * Overwrites the file (renaming .mjs/.cjs → .js).
- *
- * Usage:
- *   node transpile-single.cjs inputFile.js
- */
-
 const path = require('path');
 const fs = require('fs/promises');
 const babel = require('@babel/core');
@@ -17,14 +8,11 @@ async function main() {
     console.error('Usage: node transpile-single.cjs inputFile.js');
     process.exit(1);
   }
-
   const inputFile = path.resolve(argv[0]);
-
   if (!/\.(mjs|cjs|js)$/.test(inputFile)) {
     console.error('Error: Input must be a .js, .mjs, or .cjs file');
     process.exit(1);
   }
-
   let code;
   try {
     code = await fs.readFile(inputFile, 'utf8');
@@ -32,7 +20,6 @@ async function main() {
     console.error(`Error: File not found - ${inputFile}`);
     process.exit(1);
   }
-
   const babelOpts = {
     sourceMaps: false,
     babelrc: false,
@@ -53,15 +40,12 @@ async function main() {
 
   try {
     const result = await babel.transformAsync(code, babelOpts);
-
     if (!result || !result.code) {
       console.error('Error: Babel produced no output');
       process.exit(1);
     }
-
     const outFile = inputFile.replace(/\.(mjs|cjs)$/, '.js');
     await fs.writeFile(outFile, result.code, 'utf8');
-    // console.log(`✔ Transpiled -> ${outFile}`);
   } catch (err) {
     console.error(`Babel error: ${err.message}`);
     process.exit(1);

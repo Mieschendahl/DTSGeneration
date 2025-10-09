@@ -27,7 +27,7 @@ def generate(
     llm_temperature: int = 0,
     llm_verbose: bool = False,
     llm_interactive: bool = False,
-    llm_use_cache: bool = True
+    llm_use_cache: bool = False
 ) -> None:
     with printer(f"Starting generation:"):
         try:

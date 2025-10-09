@@ -141,23 +141,23 @@ def generate_declarations(
                         # Generate .d.ts file using dts-generate
                         with printer(f"Running ts-declaration-file-generator:"):
                             script_path = SCRIPTS_PATH / "generateDeclarationFile.sh"
-                            tsd_path = playground_path / "ts-declaration-file-generator"
-                            create_dir(tsd_path, overwrite=True)
+                            declaration_path = playground_path / "ts-declaration-file-generator"
+                            create_dir(declaration_path, overwrite=True)
                             shell_output = shell(
-                                f"{script_path} {run_time_path.relative_to(playground_path)} {package_name} {tsd_path.relative_to(playground_path)}",
+                                f"{script_path} {run_time_path.relative_to(playground_path)} {package_name} {declaration_path.relative_to(playground_path)}",
                                 cwd=playground_path,
                                 check=False,
                                 timeout=execution_timeout,
                                 verbose=verbose_execution
                             )
-                            tsd_path = tsd_path / package_name / "index.d.ts"
-                            if shell_output.code or not tsd_path.is_file() or not tsd_path.read_text():
+                            declaration_path = declaration_path / package_name / "index.d.ts"
+                            if shell_output.code or not declaration_path.is_file() or not declaration_path.read_text():
                                 printer(f"Fail")
                                 continue
-                            printer(f"Success")
-                            # Saving generated d.ts file
-                            tsd_content = tsd_path.read_text().strip()
-                            create_file(declarations_sub_path / example_path.name.replace(".js", ".d.ts"), content=tsd_content)
+                            declaration = declaration_path.read_text().strip()
                             if verbose_files:
                                 with printer(f"Declaration content:"):
-                                    printer(tsd_content)
+                                    printer(declaration)
+                            printer(f"Success")
+                        # Saving generated d.ts file
+                        create_file(declarations_sub_path / example_path.name.replace(".js", ".d.ts"), content=declaration)

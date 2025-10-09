@@ -10,8 +10,10 @@ from dts_generation._generation import generate
 
 def evaluate(
     output_path: Path,
+    build_path: Path,
     start: int = 0,
     length: Optional[int] = None,
+    random_seed: Optional[int] = 42,
     execution_timeout: int = 60,
     installation_timeout: int = 600,
     verbose: bool = True,
@@ -19,16 +21,17 @@ def evaluate(
     verbose_execution: bool = False,
     verbose_files: bool = False,
     remove_cache: bool = True,
-    random_seed: Optional[int] = 42,
+    evaluate_package: bool = True,
+    extract_from_readme: bool = True,
+    generate_with_llm: bool = True,
     llm_model_name: str = "gpt-4o-mini",
     llm_temperature: int = 0,
     llm_verbose: bool = False,
-    llm_interactive: bool = False,
-    llm_use_cache: bool = False
+    llm_interactive: bool = False
 ) -> None:
     with printer("Starting evaluation:"):
         with printer.with_verbose(verbose):
-            dt_path = output_path / "DefinitelyTyped"
+            dt_path = build_path / "DefinitelyTyped"
             build_definitely_typed(dt_path, installation_timeout, verbose_setup)
             package_names = [path.name for path in (dt_path / "types").iterdir() if path.is_dir()]
             package_names.sort()
@@ -54,7 +57,7 @@ def evaluate(
                         generate(
                             package_name=package_name,
                             output_path=package_path,
-                            build_path=output_path,
+                            build_path=build_path,
                             execution_timeout=execution_timeout,
                             installation_timeout=installation_timeout,
                             verbose=verbose,
@@ -65,14 +68,14 @@ def evaluate(
                             generate_examples=True,
                             generate_declarations=True,
                             generate_comparisons=True,
-                            evaluate_package=True,
-                            extract_from_readme=True,
-                            generate_with_llm=True,
+                            evaluate_package=evaluate_package,
+                            extract_from_readme=extract_from_readme,
+                            generate_with_llm=generate_with_llm,
                             llm_model_name=llm_model_name,
                             llm_temperature=llm_temperature,
                             llm_verbose=llm_verbose,
                             llm_interactive=llm_interactive,
-                            llm_use_cache=llm_use_cache,
+                            llm_use_cache=False,
                         )
                     except EvaluationError as e:
                         with printer(f"Generation failed (unsupported package):"): # Unsupported in terms of Node 11

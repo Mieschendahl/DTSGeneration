@@ -5,55 +5,64 @@ function getExportedSymbols(symbol: ts.Symbol): ts.Symbol[] {
   return symbol.exports ? Array.from(symbol.exports.values()) : [];
 }
 
-function areContainersAssignable(
+function isSubModule(
   checker: ts.TypeChecker,
   moduleA: ts.Symbol,
   moduleB: ts.Symbol
-): any {
+): {
+    isSubModule: boolean;
+    subTypeFraction: number;
+    subTypes: Record<string, string | null>;
+} {
   const exportsA = getExportedSymbols(moduleA);
   const exportsB = getExportedSymbols(moduleB);
-  const matches: Record<string, string[]> = {};
-  let allMatched = true;
-
+  const subs: Record<string, string | null> = {};
+  let num_subs = 0;
   for (const symbolB of exportsB) {
     const typeB = symbolB.valueDeclaration ? checker.getTypeOfSymbolAtLocation(symbolB, symbolB.valueDeclaration) : checker.getDeclaredTypeOfSymbol(symbolB);
-    const assignable = [];
-    let isAssignable = false;
+    subs[symbolB.getName()] = null;
     for (const symbolA of exportsA) {
       const typeA = symbolA.valueDeclaration ? checker.getTypeOfSymbolAtLocation(symbolA, symbolA.valueDeclaration) : checker.getDeclaredTypeOfSymbol(symbolA);
       if (checker.isTypeAssignableTo(typeA, typeB)) {
-        // console.log("Found match:", symbolB.getName(), symbolA.getName());
-        assignable.push(symbolA.getName());
-        isAssignable = true;
+        subs[symbolB.getName()] = symbolA.getName();
+        num_subs++;
+        break;
       }
     }
-    if (!isAssignable) {
-      // console.log("Found no match:", symbolB.getName());
-      allMatched = false;
-    }
-    matches[symbolB.getName()] = assignable;
   }
-  return {matched: `${Object.values(matches).filter(value => value.length > 0).length}/${exportsB.length}`, matches: matches};
+  return {
+    isSubModule: num_subs === exportsB.length,
+    subTypeFraction: exportsB.length > 0 ? num_subs / exportsB.length : 1,
+    subTypes: subs
+  }
 }
 
 function main() {
-    const filePathA = "./prediction.d.ts";
-    const filePathB = "./truth.d.ts";
+    const filePathA = "./predicted.d.ts";
+    const filePathB = "./expected.d.ts";
     const program = ts.createProgram([filePathA, filePathB], {});
     const checker = program.getTypeChecker();
     const sourceFileA = program.getSourceFile(filePathA);
     const sourceFileB = program.getSourceFile(filePathB);
     if (!sourceFileA || !sourceFileB) throw Error("Source files not found");
-    const symbolA = checker.getSymbolAtLocation(sourceFileA);
-    const symbolB = checker.getSymbolAtLocation(sourceFileB);
-    if (!symbolA || !symbolB) throw Error("Symbol not found");
-    
-    const resultA = areContainersAssignable(checker, symbolA, symbolB);
-    // console.log(`Is generated assignable to manual? ${resultA.all_matched}`);
-    const resultB = areContainersAssignable(checker, symbolB, symbolA);
-    // console.log(`Is manual assignable to generated? ${resultB.all_matched}`);
-
-    fs.writeFileSync("comparison.json", JSON.stringify({"generated_sub_manual": resultA, "manual_sub_generated": resultB}, null, 2));
+    const sourceSymbolA = checker.getSymbolAtLocation(sourceFileA);
+    const sourceSymbolB = checker.getSymbolAtLocation(sourceFileB);
+    if (!sourceSymbolA || !sourceSymbolB) throw Error("Symbol not found");
+    const resultA = isSubModule(checker, sourceSymbolA, sourceSymbolB);
+    const resultB = isSubModule(checker, sourceSymbolB, sourceSymbolA);
+    const result = {
+      isSound: resultB.isSubModule,
+      soundness: resultB.subTypeFraction,
+      isComplete: resultA.isSubModule,
+      completeness: resultA.subTypeFraction,
+      isEquivalent: resultA.isSubModule && resultB.isSubModule,
+      equivalence: resultA.subTypeFraction * resultB.subTypeFraction,
+      // maps a predicted exported type to an expected exported sub type, if it exists (determines soundness)
+      predicted_export_to_expected_export_sub_type: resultB.subTypes,
+      // maps an expected exported type to a predicted exported sub type, if it exists (determines completeness)
+      expected_export_to_predicted_export_sub_type: resultA.subTypes
+    }
+    fs.writeFileSync("comparison.json", JSON.stringify(result, null, 2));
 }
 
 main();
