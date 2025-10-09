@@ -37,8 +37,8 @@ function areContainersAssignable(
 }
 
 function main() {
-    const filePathA = "./generated.d.ts";
-    const filePathB = "./manual.d.ts";
+    const filePathA = "./prediction.d.ts";
+    const filePathB = "./truth.d.ts";
     const program = ts.createProgram([filePathA, filePathB], {});
     const checker = program.getTypeChecker();
     const sourceFileA = program.getSourceFile(filePathA);

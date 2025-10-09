@@ -1,3 +1,6 @@
-from dts_generation._generate_js import generate_examples
-from dts_generation._generate_dts import generate_declarations
-from dts_generation._compare_dts import compare_to_definitely_typed
+from dts_generation._utils import GenerationError
+from dts_generation._example import generate_examples, EvaluationError
+from dts_generation._declaration import generate_declarations
+from dts_generation._comparison import generate_comparisons
+from dts_generation._generation import generate
+from dts_generation._evaluation import evaluate
