@@ -3,6 +3,7 @@ from functools import partial
 import json
 from pathlib import Path
 import re
+import shutil
 from typing import Optional
 
 from easy_prompting.prebuilt import GPT, LogList, LogFile, LogFunc, LogReadable, Prompter, IList, IData, ICode, IChoice, IItem, delimit_code, list_text, create_interceptor, pad_text
@@ -152,7 +153,8 @@ def generate_examples(
     llm_verbose: bool,
     llm_interactive: bool,
     llm_use_cache: bool, # Makes llm_temperature > 0 obsolete,
-    combine_examples: bool
+    combine_examples: bool,
+    combined_only: bool
 ) -> None:
     with printer(f"Generating examples:"):
         llm_verbose = llm_verbose or llm_interactive
@@ -261,7 +263,7 @@ def generate_examples(
         create_dir(playground_path, overwrite=True)
         examples_path = output_path / "examples"
         create_dir(examples_path, overwrite=True)
-        candidates_path = cache_path / "example_candidates"
+        candidates_path = cache_path / "candidates"
         create_dir(candidates_path, overwrite=True)
         template_path = cache_path / "template"
         build_template_project(package_name, template_path, installation_timeout, verbose_setup)
@@ -288,7 +290,9 @@ def generate_examples(
                 if not readme:
                     raise GenerationError("Readme file missing for extraction mode")
                 examples_sub_path = examples_path / "extraction"
+                create_dir(examples_sub_path, overwrite=True)
                 candidates_sub_path = candidates_path / "extraction"
+                create_dir(candidates_sub_path, overwrite=True)
                 examples = re.findall( r"```.*?\n(.*?)```", readme, flags=re.DOTALL)
                 examples = [example.strip() for example in examples]
                 printer(f"Found {len(examples)} example(s)")
@@ -297,14 +301,19 @@ def generate_examples(
                 if combine_examples:
                     with printer("Combining extracted examples:"):
                         example = combine_example_files(get_children(examples_sub_path))
-                        examples_sub_path = examples_path / "combined_extraction"
-                        candidates_sub_path = candidates_path / "combined_extraction"
-                        test_example(0, example, examples_sub_path, candidates_sub_path)
+                        combined_examples_sub_path = examples_path / "combined_extraction"
+                        combined_candidates_sub_path = candidates_path / "combined_extraction"
+                        test_example(0, example, combined_examples_sub_path, combined_candidates_sub_path)
+                    if combined_only:
+                        create_dir(cache_path / "examples" / examples_sub_path.name, examples_sub_path, overwrite=True) # for debug / combining all
+                        shutil.rmtree(examples_sub_path, ignore_errors=True)
         # Generate examples with an LLM
         if generate_with_llm:
             with printer(f"Generating examples with LLM:"):
                 examples_sub_path = examples_path / "generation"
+                create_dir(examples_sub_path, overwrite=True)
                 candidates_sub_path = candidates_path / "generation"
+                create_dir(candidates_sub_path, overwrite=True)
                 readable_logger = LogReadable(LogFunc(partial(printer, end="\n\n")))
                 readable_logger.set_verbose(llm_verbose)
                 tag = "generation"
@@ -398,9 +407,22 @@ def generate_examples(
                                 )
                             continue
                         break
+                # Currently only one example is produced, so this is unecessary but more uniform.
+                # Even if multiple examples are produced, we still have to ask if we want an LLM to combine them.
+                if combine_examples:
+                    with printer("Combining generated examples:"):
+                        example = combine_example_files(get_children(examples_sub_path))
+                        combined_examples_sub_path = examples_path / "combined_generation"
+                        combined_candidates_sub_path = candidates_path / "combined_generation"
+                        test_example(0, example, combined_examples_sub_path, combined_candidates_sub_path)
+                    if combined_only:
+                        create_dir(cache_path / "examples" / examples_sub_path.name, examples_sub_path, overwrite=True) # for debug / combining all
+                        shutil.rmtree(examples_sub_path, ignore_errors=True)
         if combine_examples and extract_from_readme and generate_with_llm:
             with printer("Combining all examples:"):
-                example = combine_example_files(get_children(examples_path / "extraction") + get_children(examples_path / "generation"))
-                examples_sub_path = examples_path / "combined_all"
-                candidates_sub_path = candidates_path / "combined_all"
-                test_example(0, example, examples_sub_path, candidates_sub_path)
+                example = combine_example_files(
+                    get_children(cache_path / "examples" / "extraction") + get_children(cache_path / "examples" / "generation")
+                )
+                combined_examples_sub_path = examples_path / "combined_all"
+                combined_candidates_sub_path = candidates_path / "combined_all"
+                test_example(0, example, combined_examples_sub_path, combined_candidates_sub_path)

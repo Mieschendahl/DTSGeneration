@@ -51,12 +51,9 @@ def generate(
                         llm_verbose=llm_verbose,
                         llm_interactive=llm_interactive,
                         llm_use_cache=llm_use_cache,
-                        combine_examples=combine_examples
+                        combine_examples=combine_examples,
+                        combined_only=combined_only
                     )
-                    if combined_only:
-                        if not is_empty(output_path / "examples" / "extraction"):
-                            create_dir(output_path / "cache" / "examples" / "extraction", output_path / "examples" / "extraction", overwrite=True)
-                            shutil.rmtree(output_path / "examples" / "extraction", ignore_errors=True)
                 if generate_declarations:
                     assert build_path is not None, "Build path can not be None for declaration generation"
                     assert package_name == escape_package_name(package_name), "ts-declaration-file-generator does not support qualilfied package names"
