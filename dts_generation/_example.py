@@ -5,8 +5,8 @@ from pathlib import Path
 import re
 from typing import Optional
 
-from easy_prompting.prebuilt import GPT, LogList, LogFile, LogFunc, LogReadable, Prompter, IList, IData, ICode, IChoice, IItem, delimit_code, list_text, create_interceptor
-from dts_generation._utils import create_dir, printer, create_file, shell, GenerationError
+from easy_prompting.prebuilt import GPT, LogList, LogFile, LogFunc, LogReadable, Prompter, IList, IData, ICode, IChoice, IItem, delimit_code, list_text, create_interceptor, pad_text
+from dts_generation._utils import ShellOutput, create_dir, get_children, is_empty, printer, create_file, shell, GenerationError
 
 MAX_NUM_MESSAGE_LINES = 3
 MAX_NUM_TESTS = 3
@@ -17,7 +17,7 @@ class EvaluationError(GenerationError):
 
 def clone_repository(package_name: str, output_path: Path, installation_timeout: int, verbose_setup: bool) -> None:
     with printer(f"Cloning the GitHub repository:"):
-        if output_path.is_dir() and any(output_path.iterdir()):
+        if not is_empty(output_path):
             printer(f"Success (already cloned)")
             return
         shell_output = shell(f"npm view {package_name} repository --json", timeout=installation_timeout, verbose=verbose_setup)
@@ -53,7 +53,7 @@ def get_package_json(output_path: Path, repository_path: Path) -> Optional[str]:
 
 def get_readme(output_path: Path, repository_path: Path) -> Optional[str]:
     assert repository_path.is_dir(), "Repository not found"
-    for readme_path in repository_path.iterdir():
+    for readme_path in get_children(repository_path):
         if readme_path.is_file() and "readme" in readme_path.name.lower():
             readme = readme_path.read_text()
             create_file(output_path, content=readme)#
@@ -99,7 +99,7 @@ def get_tests(output_path: Path, repository_path: Path) -> list[tuple[str, str]]
                 tests[f.relative_to(repository_path)] = f.read_text()
             for f in test_path.rglob("*.ts"):
                 tests[f.relative_to(repository_path)] = f.read_text()
-    # Sntire repo for suffixes
+    # Check repo for suffixes
     test_suffixes = [".test.js", ".spec.js", ".test.ts", ".spec.ts"]
     for suffix in test_suffixes:
         for f in repository_path.rglob(f"*{suffix}"):
@@ -108,19 +108,33 @@ def get_tests(output_path: Path, repository_path: Path) -> list[tuple[str, str]]
     tests = [(path, content) for path, content in sorted(tests.items()) if content]
     create_dir(output_path, overwrite=True)
     for i, (path, content) in enumerate(tests):
-        (output_path / f"{i}.js").write_text(f"// file-path: {path}\n\n{content}")
+        (output_path / f"{i}.js").write_text(f"// File: {path}\n\n{content}")
     printer(f"{len(tests)} test file(s) found")
     return tests
 
 def build_template_project(package_name: str, output_path: Path, installation_timeout: int, verbose_setup: bool):
     with printer(f"Building template npm project:"):
-        if output_path.is_dir() and any(output_path.iterdir()):
+        if not is_empty(output_path):
             printer("Success (already build)")
             return
         create_dir(output_path, overwrite=True)
         with printer(f"Installing packages:"):
             shell(f"npm install tsx typescript @types/node {package_name}", cwd=output_path, timeout=installation_timeout, verbose=verbose_setup)
             printer(f"Success")
+
+def combine_example_files(file_paths: list[Path]) -> str:
+    with printer(f"Combining examples:"):
+        combined_parts = []
+        for file_path in file_paths:
+            content = file_path.read_text()
+            wrapped = (
+                f"// --- Begin {file_path} ---\n"
+                f"(function() {"{\n" + pad_text(content, "  ") + "\n}"})();\n"
+                f"// --- End {file_path} ---"
+            )
+            combined_parts.append(wrapped)
+        printer(f"Success")
+        return "\n\n".join(combined_parts)
 
 def generate_examples(
     package_name: str,
@@ -137,7 +151,8 @@ def generate_examples(
     llm_temperature: int,
     llm_verbose: bool,
     llm_interactive: bool,
-    llm_use_cache: bool # Makes llm_temperature > 0 obsolete
+    llm_use_cache: bool, # Makes llm_temperature > 0 obsolete,
+    combine_examples: bool
 ) -> None:
     with printer(f"Generating examples:"):
         llm_verbose = llm_verbose or llm_interactive
@@ -245,11 +260,28 @@ def generate_examples(
         playground_path = cache_path / "playground"
         create_dir(playground_path, overwrite=True)
         examples_path = output_path / "examples"
-        create_dir(examples_path, overwrite=False)
+        create_dir(examples_path, overwrite=True)
         candidates_path = cache_path / "example_candidates"
-        create_dir(candidates_path, overwrite=False)
+        create_dir(candidates_path, overwrite=True)
         template_path = cache_path / "template"
         build_template_project(package_name, template_path, installation_timeout, verbose_setup)
+        # Defining reusable helper function for example testing
+        def test_example(example_index: int, example: str, examples_path: Path, candidates_path: Path) -> ShellOutput:
+            with printer(f"Testing example:"):
+                if verbose_files:
+                    with printer(f"Example content:"):
+                        printer(example)
+                with printer(f"Running example with Node:"):
+                    create_file(candidates_path / f"{example_index}.js", content=example)
+                    create_dir(playground_path, template_path, overwrite=True)
+                    create_file(playground_path / "index.js", content=example)
+                    shell_output = shell(f"node index.js", cwd=playground_path, check=False, timeout=execution_timeout, verbose=verbose_execution)
+                    if shell_output.code:
+                        printer(f"Fail")
+                    else:
+                        printer(f"Success")
+                        create_file(examples_path / f"{example_index}.js", content=example)
+                    return shell_output
         # Manually extract examples from the readme file of the package
         if extract_from_readme:
             with printer(f"Extracting examples from the readme file:"):
@@ -261,20 +293,13 @@ def generate_examples(
                 examples = [example.strip() for example in examples]
                 printer(f"Found {len(examples)} example(s)")
                 for example_index, example in enumerate(examples):
-                    with printer(f"Testing example {example_index}:"):
-                        if verbose_files:
-                            with printer(f"Example content:"):
-                                printer(example)
-                        with printer(f"Running example with Node:"):
-                            create_file(candidates_sub_path / f"{example_index}.js", content=example)
-                            create_dir(playground_path, template_path, overwrite=True)
-                            create_file(playground_path / "index.js", content=example)
-                            shell_output = shell(f"node index.js", cwd=playground_path, check=False, timeout=execution_timeout, verbose=verbose_execution)
-                            if shell_output.code:
-                                printer(f"Fail")
-                            else:
-                                printer(f"Success")
-                                create_file(examples_sub_path / f"{example_index}.js", content=example)
+                    test_example(example_index, example, examples_sub_path, candidates_sub_path)
+                if combine_examples:
+                    with printer("Combining extracted examples:"):
+                        example = combine_example_files(get_children(examples_sub_path))
+                        examples_sub_path = examples_path / "combined_extraction"
+                        candidates_sub_path = candidates_path / "combined_extraction"
+                        test_example(0, example, examples_sub_path, candidates_sub_path)
         # Generate examples with an LLM
         if generate_with_llm:
             with printer(f"Generating examples with LLM:"):
@@ -358,30 +383,24 @@ def generate_examples(
                                     )
                                 )[1]
                             printer(f"Success")
-                        with printer(f"Testing example {example_index}:"):
-                            if verbose_files:
-                                with printer(f"Content:"):
-                                    printer(example)
-                            with printer(f"Running example with Node:"):
-                                create_file(candidates_sub_path / f"{example_index}.js", content=example)
-                                create_dir(playground_path, template_path, overwrite=True)
-                                create_file(playground_path / "index.js", content=example)
-                                shell_output = shell(f"node index.js", cwd=playground_path, check=False, timeout=execution_timeout, verbose=verbose_execution)
-                                if shell_output.code:
-                                    printer(f"Fail (retrying example generation)")
-                                    if shell_output.timeout:
-                                        agent.add_message(
-                                            f"Running your example with Node did not finish after {execution_timeout} seconds:"
-                                            f"\n{delimit_code(shell_output.value, "shell")}"
-                                        )
-                                    else:
-                                        agent.add_message(
-                                            f"Running your example with Node failed with code {shell_output.code}:"
-                                            f"\n{delimit_code(shell_output.value, "shell")}"
-                                        )
-                                    example_index += 1
-                                    continue
-                                printer(f"Success")
-                        create_file(examples_sub_path / f"{example_index}.js", content=example)
+                            shell_output = test_example(example_index, example, examples_sub_path, candidates_sub_path)
                         example_index += 1
+                        if shell_output.code:
+                            if shell_output.timeout:
+                                agent.add_message(
+                                    f"Running your example with Node did not finish after {execution_timeout} seconds:"
+                                    f"\n{delimit_code(shell_output.value, "shell")}"
+                                )
+                            else:
+                                agent.add_message(
+                                    f"Running your example with Node failed with code {shell_output.code}:"
+                                    f"\n{delimit_code(shell_output.value, "shell")}"
+                                )
+                            continue
                         break
+        if combine_examples and extract_from_readme and generate_with_llm:
+            with printer("Combining all examples:"):
+                example = combine_example_files(get_children(examples_path / "extraction") + get_children(examples_path / "generation"))
+                examples_sub_path = examples_path / "combined_all"
+                candidates_sub_path = candidates_path / "combined_all"
+                test_example(0, example, examples_sub_path, candidates_sub_path)

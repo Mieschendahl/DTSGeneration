@@ -27,15 +27,16 @@ generate(
     generate_examples=True,
     generate_declarations=True,
     generate_comparisons=True,
-    combine_comparisons=True,
     evaluate_package=True,
     extract_from_readme=True,
     generate_with_llm=True,
     verbose=True,
     verbose_setup=False,
     verbose_execution=False,
-    verbose_files=True,
+    verbose_files=False,
     llm_interactive=False,
-    llm_use_cache=True
+    llm_use_cache=True,
+    combine_examples=True,
+    combined_only=True
 )
 

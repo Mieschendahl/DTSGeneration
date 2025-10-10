@@ -1,14 +1,14 @@
 import platform
 from pathlib import Path
 
-from dts_generation._utils import printer, create_file, shell, create_dir
+from dts_generation._utils import get_children, is_empty, printer, create_file, shell, create_dir
 from dts_generation._example import build_template_project
 
 SCRIPTS_PATH = Path(__file__).parent.parent / "assets" / "declaration"
 
 def build_run_time_information_gathering(output_path: Path, installation_timeout: int, verbose_setup: bool) -> None:
     with printer(f"Cloning run-time-information-gathering repository:"):
-        if output_path.is_dir() and any(output_path.iterdir()):
+        if not is_empty(output_path):
             printer(f"Success (already build)")
             return
         create_dir(output_path, overwrite=True)
@@ -26,7 +26,7 @@ def build_run_time_information_gathering(output_path: Path, installation_timeout
 
 def build_ts_declaration_file_generator(output_path: Path, installation_timeout: int, verbose_setup: bool) -> None:
     with printer(f"Cloning ts-declaration-file-generator repository:"):
-        if output_path.is_dir() and any(output_path.iterdir()):
+        if not is_empty(output_path):
             printer(f"Success (already build)")
             return
         create_dir(output_path, overwrite=True)
@@ -43,7 +43,7 @@ def build_ts_declaration_file_generator(output_path: Path, installation_timeout:
 
 def build_npm_tools(output_path: Path, installation_timeout: int, verbose_setup: bool) -> None:
     with printer(f"Building npm tools:"):
-        if output_path.is_dir() and (output_path / "transpile.js").is_file():
+        if not is_empty(output_path) and (output_path / "transpile.js").is_file():
             printer(f"Success (already build)")
             return
         create_dir(output_path, overwrite=True)
@@ -77,24 +77,24 @@ def generate_declarations(
         examples_path = output_path / "examples"
         assert examples_path.is_dir(), "Example directory missing"
         transpiled_path = cache_path / "transpiled_examples"
-        create_dir(transpiled_path, overwrite=False)
+        create_dir(transpiled_path, overwrite=True)
         playground_path = cache_path / "playground"
         create_dir(playground_path, overwrite=True)
         declarations_path = output_path / "declarations"
-        create_dir(declarations_path, overwrite=False)
+        create_dir(declarations_path, overwrite=True)
         template_path = cache_path / "template"
         build_template_project(package_name, template_path, installation_timeout, verbose_setup)
         # Iterate over sub directories in the example directory (corresponding to the different example generation modes)
-        for examples_sub_path in examples_path.iterdir():
+        for examples_sub_path in get_children(examples_path):
             if not examples_sub_path.is_dir():
                 continue
             with printer(f"Generating declarations for \"{examples_sub_path.name}\" mode:"):
-                iterdir = [path for path in examples_sub_path.iterdir() if path.name.endswith(".js")]
-                printer(f"Found {len(iterdir)} example(s)")
+                children = get_children(examples_sub_path)
+                printer(f"Found {len(children)} example(s)")
                 declarations_sub_path = declarations_path / examples_sub_path.name
                 transpiled_sub_path = transpiled_path / examples_sub_path.name
                 create_dir(declarations_sub_path, overwrite=True)
-                for example_path in iterdir:
+                for example_path in children:
                     with printer(f"Generating declaration for {example_path.name}:"):
                         if verbose_files:
                             with printer(f"Example content:"):

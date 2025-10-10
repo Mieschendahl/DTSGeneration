@@ -3,7 +3,7 @@ import random
 import shutil
 from typing import Optional
 
-from dts_generation._utils import GenerationError, create_dir, escape_package_name, printer, unescape_package_name
+from dts_generation._utils import GenerationError, create_dir, escape_package_name, get_children, printer, unescape_package_name
 from dts_generation._example import EvaluationError
 from dts_generation._comparison import build_definitely_typed
 from dts_generation._generation import generate
@@ -33,7 +33,7 @@ def evaluate(
         with printer.with_verbose(verbose):
             dt_path = build_path / "DefinitelyTyped"
             build_definitely_typed(dt_path, installation_timeout, verbose_setup)
-            package_names = [path.name for path in (dt_path / "types").iterdir() if path.is_dir()]
+            package_names = [path.name for path in get_children(dt_path / "types") if path.is_dir()]
             package_names.sort()
             # ts-declaration-file-generator currently does not qualified package names (e.g. @babel/core)
             printer(f"Removing packages with qualified names (not supported)")
@@ -68,7 +68,6 @@ def evaluate(
                             generate_examples=True,
                             generate_declarations=True,
                             generate_comparisons=True,
-                            combine_comparisons=True,
                             evaluate_package=evaluate_package,
                             extract_from_readme=extract_from_readme,
                             generate_with_llm=generate_with_llm,
@@ -77,6 +76,8 @@ def evaluate(
                             llm_verbose=llm_verbose,
                             llm_interactive=llm_interactive,
                             llm_use_cache=False,
+                            combine_examples=True,
+                            combined_only=True
                         )
                     except EvaluationError as e:
                         with printer(f"Generation failed (unsupported package):"): # Unsupported in terms of Node 11

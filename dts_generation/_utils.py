@@ -175,3 +175,10 @@ def unescape_package_name(name: str) -> str:
         scope, pkg = name.split("__", 1)
         return f"@{scope}/{pkg}"
     return name
+
+def get_children(dir_path: Path) -> list[Path]:
+    assert dir_path.is_dir(), "dir_path must be a path to a directory"
+    return sorted(dir_path.iterdir(), key=lambda path: path.name)
+
+def is_empty(dir_path: Path) -> bool:
+    return not (dir_path.is_dir() and any(dir_path.iterdir()))
