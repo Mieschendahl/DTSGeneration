@@ -68,6 +68,7 @@ def evaluate(
                             generate_examples=True,
                             generate_declarations=True,
                             generate_comparisons=True,
+                            combine_comparisons=True,
                             evaluate_package=evaluate_package,
                             extract_from_readme=extract_from_readme,
                             generate_with_llm=generate_with_llm,

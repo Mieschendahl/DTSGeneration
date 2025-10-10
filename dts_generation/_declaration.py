@@ -2,11 +2,11 @@ import platform
 from pathlib import Path
 
 from dts_generation._utils import printer, create_file, shell, create_dir
-from dts_generation._example import GENERATION_MODES, build_template_project
+from dts_generation._example import build_template_project
 
 SCRIPTS_PATH = Path(__file__).parent.parent / "assets" / "declaration"
 
-def build_run_time_information_gathering(output_path: Path, installation_timeout: int, verbose: bool) -> None:
+def build_run_time_information_gathering(output_path: Path, installation_timeout: int, verbose_setup: bool) -> None:
     with printer(f"Cloning run-time-information-gathering repository:"):
         if output_path.is_dir() and any(output_path.iterdir()):
             printer(f"Success (already build)")
@@ -15,16 +15,16 @@ def build_run_time_information_gathering(output_path: Path, installation_timeout
         shell(
             f"git clone --depth 1 https://github.com/Proglang-TypeScript/run-time-information-gathering.git {output_path}",
             timeout=installation_timeout,
-            verbose=verbose
+            verbose=verbose_setup
         )
         printer(f"Success")
     # We tie building the docker image to whether the repository needs to be cloned (simple build control)
     with printer(f"Building run-time-information-gathering docker image:"):
-        shell(f"{output_path}/build/build.sh", check=False, timeout=installation_timeout, verbose=verbose)
+        shell(f"{output_path}/build/build.sh", check=False, timeout=installation_timeout, verbose=verbose_setup)
         # printer(f"Success")
         printer(f"Success (ignoring test errors)")
 
-def build_ts_declaration_file_generator(output_path: Path, installation_timeout: int, verbose: bool) -> None:
+def build_ts_declaration_file_generator(output_path: Path, installation_timeout: int, verbose_setup: bool) -> None:
     with printer(f"Cloning ts-declaration-file-generator repository:"):
         if output_path.is_dir() and any(output_path.iterdir()):
             printer(f"Success (already build)")
@@ -33,15 +33,15 @@ def build_ts_declaration_file_generator(output_path: Path, installation_timeout:
         shell(
             f"git clone --depth 1 https://github.com/Proglang-TypeScript/ts-declaration-file-generator.git {output_path}",
             timeout=installation_timeout,
-            verbose=verbose
+            verbose=verbose_setup
         )
         printer(f"Success")
     # We tie building the docker image to whether the repository needs to be cloned (simple build control)
     with printer(f"Building ts-declaration-file-generator docker image:"):
-        shell(f"{output_path}/build/build.sh", timeout=installation_timeout, verbose=verbose)
+        shell(f"{output_path}/build/build.sh", timeout=installation_timeout, verbose=verbose_setup)
         printer(f"Success")
 
-def build_npm_tools(output_path: Path, installation_timeout: int, verbose: bool) -> None:
+def build_npm_tools(output_path: Path, installation_timeout: int, verbose_setup: bool) -> None:
     with printer(f"Building npm tools:"):
         if output_path.is_dir() and (output_path / "transpile.js").is_file():
             printer(f"Success (already build)")
@@ -52,7 +52,7 @@ def build_npm_tools(output_path: Path, installation_timeout: int, verbose: bool)
             f"npm install @babel/core @babel/preset-env", # fast-glob nyc
             cwd=output_path,
             timeout=installation_timeout,
-            verbose=verbose
+            verbose=verbose_setup
         )
         create_file(output_path / "transpile.js", SCRIPTS_PATH / "transpile.js")
         printer(f"Success")
@@ -85,16 +85,16 @@ def generate_declarations(
         template_path = cache_path / "template"
         build_template_project(package_name, template_path, installation_timeout, verbose_setup)
         # Iterate over sub directories in the example directory (corresponding to the different example generation modes)
-        for mode in GENERATION_MODES:
-            examples_sub_path = examples_path / mode
+        for examples_sub_path in examples_path.iterdir():
             if not examples_sub_path.is_dir():
                 continue
             with printer(f"Generating declarations for \"{examples_sub_path.name}\" mode:"):
-                printer(f"Found {len(list(examples_sub_path.iterdir()))} example(s)")
+                iterdir = [path for path in examples_sub_path.iterdir() if path.name.endswith(".js")]
+                printer(f"Found {len(iterdir)} example(s)")
                 declarations_sub_path = declarations_path / examples_sub_path.name
                 transpiled_sub_path = transpiled_path / examples_sub_path.name
                 create_dir(declarations_sub_path, overwrite=True)
-                for example_path in examples_sub_path.iterdir():
+                for example_path in iterdir:
                     with printer(f"Generating declaration for {example_path.name}:"):
                         if verbose_files:
                             with printer(f"Example content:"):
@@ -158,6 +158,5 @@ def generate_declarations(
                             if verbose_files:
                                 with printer(f"Declaration content:"):
                                     printer(declaration)
+                            create_file(declarations_sub_path / example_path.name.replace(".js", ".d.ts"), content=declaration)
                             printer(f"Success")
-                        # Saving generated d.ts file
-                        create_file(declarations_sub_path / example_path.name.replace(".js", ".d.ts"), content=declaration)

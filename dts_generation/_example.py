@@ -11,17 +11,16 @@ from dts_generation._utils import create_dir, printer, create_file, shell, Gener
 MAX_NUM_MESSAGE_LINES = 3
 MAX_NUM_TESTS = 3
 MAX_NUM_GENERATION_ATTEMPTS = 3
-GENERATION_MODES = ["extraction", "generation"]
 
 class EvaluationError(GenerationError):
     pass
 
-def clone_repository(package_name: str, output_path: Path, installation_timeout: int, verbose: bool) -> None:
+def clone_repository(package_name: str, output_path: Path, installation_timeout: int, verbose_setup: bool) -> None:
     with printer(f"Cloning the GitHub repository:"):
         if output_path.is_dir() and any(output_path.iterdir()):
             printer(f"Success (already cloned)")
             return
-        shell_output = shell(f"npm view {package_name} repository --json", timeout=installation_timeout, verbose=verbose)
+        shell_output = shell(f"npm view {package_name} repository --json", timeout=installation_timeout, verbose=verbose_setup)
         if not shell_output.value:
             raise GenerationError(f"No npm view value found")
         try:
@@ -33,7 +32,7 @@ def clone_repository(package_name: str, output_path: Path, installation_timeout:
             raise GenerationError(f"No GitHub URL found")
         github_url = "https://github.com" + url.split("github.com", 1)[-1].split(".git")[0]
         create_dir(output_path, overwrite=True)
-        shell_output = shell(f"git clone --depth 1 {github_url} {output_path}", check=False, timeout=installation_timeout, verbose=verbose)
+        shell_output = shell(f"git clone --depth 1 {github_url} {output_path}", check=False, timeout=installation_timeout, verbose=verbose_setup)
         if shell_output.code:
             if shell_output.code == 128:
                 raise GenerationError(f"GitHub URL is invalid: {github_url}")
@@ -113,14 +112,14 @@ def get_tests(output_path: Path, repository_path: Path) -> list[tuple[str, str]]
     printer(f"{len(tests)} test file(s) found")
     return tests
 
-def build_template_project(package_name: str, output_path: Path, installation_timeout: int, verbose: bool):
+def build_template_project(package_name: str, output_path: Path, installation_timeout: int, verbose_setup: bool):
     with printer(f"Building template npm project:"):
         if output_path.is_dir() and any(output_path.iterdir()):
             printer("Success (already build)")
             return
         create_dir(output_path, overwrite=True)
         with printer(f"Installing packages:"):
-            shell(f"npm install tsx typescript @types/node {package_name}", cwd=output_path, timeout=installation_timeout, verbose=verbose)
+            shell(f"npm install tsx typescript @types/node {package_name}", cwd=output_path, timeout=installation_timeout, verbose=verbose_setup)
             printer(f"Success")
 
 def generate_examples(

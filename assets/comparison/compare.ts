@@ -58,9 +58,9 @@ function main() {
       isEquivalent: resultA.isSubModule && resultB.isSubModule,
       equivalence: resultA.subTypeFraction * resultB.subTypeFraction,
       // maps a predicted exported type to an expected exported sub type, if it exists (determines soundness)
-      predicted_export_to_expected_export_sub_type: resultB.subTypes,
+      predicted_to_expected_sub: resultB.subTypes,
       // maps an expected exported type to a predicted exported sub type, if it exists (determines completeness)
-      expected_export_to_predicted_export_sub_type: resultA.subTypes
+      expected_to_predicted_sub: resultA.subTypes
     }
     fs.writeFileSync("comparison.json", JSON.stringify(result, null, 2));
 }
