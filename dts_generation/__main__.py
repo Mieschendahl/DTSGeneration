@@ -26,7 +26,8 @@ if True:
         llm_temperature=0,
         llm_verbose=False,
         llm_interactive=False,
-        reproduce=False
+        reproduce=False,
+        wait_after_error=True
     )
 else:
     package_name = "lodash.padend"

@@ -35,7 +35,8 @@ def evaluate(
     llm_temperature: int = 0,
     llm_verbose: bool = False,
     llm_interactive: bool = False,
-    reproduce: bool = False
+    reproduce: bool = False,
+    wait_after_error: bool = True
 ) -> None:
     with printer("Starting evaluation:"):
         with printer.with_verbose(verbose):
@@ -150,9 +151,14 @@ def evaluate(
                     create_file(data_path / "raised_error")
                     if verbose_exceptions:
                         with printer(f"Encountered an unexpected exception:"):
-                            printer(traceback.format_exc())
-                            printer("Waiting for input, before continuing...")
-                            input()
+                            printer(traceback.format_exc(), end="")
+                        if wait_after_error:
+                            try:
+                                printer("Waiting for user input: ", end="")
+                                input()
+                            except (KeyboardInterrupt, EOFError):
+                                printer(" User aborted")
+                                exit(0)
         sub_metrics: dict = dict(
             num_sound = 0,
             num_complete = 0,
