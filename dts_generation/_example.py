@@ -7,11 +7,12 @@ import shutil
 from typing import Optional
 
 from easy_prompting.prebuilt import GPT, LogList, LogFile, LogFunc, LogReadable, Prompter, IList, IData, ICode, IChoice, IItem, delimit_code, list_text, create_interceptor, pad_text
-from dts_generation._utils import ShellOutput, create_dir, get_children, is_empty, printer, create_file, shell
+from dts_generation._utils import create_dir, get_children, is_empty, printer, create_file, shell
 
 MAX_NUM_MESSAGE_LINES = 3
 MAX_NUM_TESTS = 3
 MAX_NUM_GENERATION_ATTEMPTS = 3
+MAX_FILE_PROMPT_LENGTH = 10000
 
 class ReproductionError(Exception):
     pass
@@ -294,17 +295,17 @@ def generate_examples(
                         if readme:
                             agent.add_message(
                                 f"Here is the readme file of the package's GitHub repository:"
-                                f"\n{delimit_code(readme, "markdown")}"
+                                f"\n{delimit_code(readme[:MAX_FILE_PROMPT_LENGTH], "markdown")}"
                             )
                         if package_json:
                             agent.add_message(
                                 f"Here is the package.json file of the package's GitHub repository:"
-                                f"\n{delimit_code(package_json, "json")}"
+                                f"\n{delimit_code(package_json[:MAX_FILE_PROMPT_LENGTH], "json")}"
                             )
                         if main:
                             agent.add_message(
                                 f"Here is the main file of the package's GitHub repository:"
-                                f"\n{delimit_code(main, "javascript")}"
+                                f"\n{delimit_code(main[:MAX_FILE_PROMPT_LENGTH], "javascript")}"
                             )
                         readable_logger.set_crop()
                         choice, (explanation,) = agent.get_data(
@@ -410,23 +411,23 @@ def generate_examples(
                     if readme:
                         agent.add_message(
                             f"Here is the readme file of the package's GitHub repository:"
-                            f"\n{delimit_code(readme, "markdown")}"
+                            f"\n{delimit_code(readme[:MAX_FILE_PROMPT_LENGTH], "markdown")}"
                         )
                     if package_json:
                         agent.add_message(
                             f"Here is the package.json file of the package's GitHub repository:"
-                            f"\n{delimit_code(package_json, "json")}"
+                            f"\n{delimit_code(package_json[:MAX_FILE_PROMPT_LENGTH], "json")}"
                         )
                     if main:
                         agent.add_message(
                             f"Here is the main file of the package's GitHub repository:"
-                            f"\n{delimit_code(main, "javascript")}"
+                            f"\n{delimit_code(main[:MAX_FILE_PROMPT_LENGTH], "javascript")}"
                         )
                     if tests:
                         agent.add_message(
                             f"Here are some test files of the package's GitHub repository:"
                             f"\n{
-                                "\n".join(f"{path}:\n{delimit_code(content, "javascript")}"
+                                "\n".join(f"{path}:\n{delimit_code(content[:MAX_FILE_PROMPT_LENGTH], "javascript")}"
                                 for path, content in tests[:MAX_NUM_TESTS])
                             }"
                         )
@@ -435,7 +436,7 @@ def generate_examples(
                     example_index = 0
                     while True:
                         with printer(f"Generating example {example_index}:"):
-                            if example_index > MAX_NUM_GENERATION_ATTEMPTS:
+                            if example_index >= MAX_NUM_GENERATION_ATTEMPTS:
                                 printer(f"Aborting: LLM failed generating a valid example in {MAX_NUM_GENERATION_ATTEMPTS} attempt(s)")
                                 break
                             example = agent.get_data(
