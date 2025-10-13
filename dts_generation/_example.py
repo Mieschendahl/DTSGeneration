@@ -182,10 +182,10 @@ def generate_examples(
         # Setting up directory interface
         cache_path = output_path / "cache"
         create_dir(cache_path, overwrite=False)
+        logs_path = output_path / "logs"
+        create_dir(logs_path, overwrite=False)
         data_path = output_path / "data"
         create_dir(data_path, overwrite=True)
-        logs_path = output_path / "logs"
-        create_dir(logs_path, overwrite=True)
         playground_path = cache_path / "playground"
         create_dir(playground_path, overwrite=True)
         examples_path = output_path / "examples"
@@ -208,7 +208,7 @@ def generate_examples(
                 with printer(f"Checking import statements:"):
                     if not re.search(require_pattern, example):
                         printer(f"Fail")
-                        return dict(require=True, code=0, error="", timeout=False)
+                        return dict(require=True, code=0, shell="", timeout=False)
                     printer(f"Success")
                 create_dir(playground_path, template_path, overwrite=True)
                 create_file(main_path, content=example)
@@ -220,12 +220,12 @@ def generate_examples(
                         printer(f"Success")
                         if examples_path is not None:
                             create_file(examples_path / f"{example_name}.js", content=example)
-                    return dict(require=False, code=shell_output.code, error=shell_output.value, timeout=shell_output.timeout)
+                    return dict(require=False, code=shell_output.code, shell=shell_output.value, timeout=shell_output.timeout)
         # Checking if package is usable
         with printer(f"Checking CommonJS support:"):
             output = test_example("test_require", f"const package = require(\"{package_name}\");", cache_path / "test")
             if output["code"]:
-                raise NotCommonJSError(f"Require statement fails on package with error:\n{pad_text(output["error"])}")
+                raise NotCommonJSError(f"Require statement fails on package with error:\n{pad_text(output["shell"])}")
         # Gather ressources for example generation
         repository_path = cache_path / "repository"
         clone_repository(package_name, repository_path, installation_timeout, verbose_setup)
@@ -238,89 +238,84 @@ def generate_examples(
         # Evaluate if the package satisfies the necessary requirements, such as Node, CommonJS, (potentially even ES5 compatibility)
         if evaluate_with_llm:
             with printer(f"Evaluating package with LLM:"):
-                readable_logger = LogReadable(LogFunc(partial(printer, end="\n\n")))
-                readable_logger.set_verbose(llm_verbose)
-                tag = "evaluation"
-                file_logger = LogFile(logs_path / f"{tag}.txt")
-                with LogList(readable_logger, file_logger) as logger:
-                    model = GPT(model=llm_model_name, temperature=llm_temperature)
-                    agent = Prompter(model)
-                    agent.set_logger(logger)
-                    if llm_interactive:
-                        agent.set_interceptor(create_interceptor(partial(printer, end="")))
-                    if llm_use_cache:
-                        agent.set_cache_path(cache_path / "prompter" / llm_model_name)
-                    agent.set_tag(tag)
-                    agent.add_message(
-                        list_text(
-                            f"You are an autonomous agent and Node expert.",
-                            f"The user is a program that can only interact with you in predetermined ways.",
-                            f"The user will give you a task and instructions on how to complete the task.",
-                            f"You should try to achieve the task by following the instructions of the user."
-                        ),
-                        role="developer"
-                    )
-                    agent.add_message(
-                        list_text(
-                            f"The npm package \"{package_name}\" can be imported via the CommonJS module system and executed via Node.",
-                            f"Your task is to decide if the package can be used directly in Node or not because e.g. it is browser-exclusive or framework-dependent."
-                        )
-                    )
-                    readable_logger.set_crop(MAX_NUM_MESSAGE_LINES)
-                    if readme:
+                if not (readme or package_json or main):
+                    printer(f"Not enough package information")
+                else:
+                    readable_logger = LogReadable(LogFunc(partial(printer, end="\n\n")))
+                    readable_logger.set_verbose(llm_verbose)
+                    tag = "evaluation"
+                    file_logger = LogFile(logs_path / f"{tag}.txt")
+                    with LogList(readable_logger, file_logger) as logger:
+                        model = GPT(model=llm_model_name, temperature=llm_temperature)
+                        agent = Prompter(model)
+                        agent.set_logger(logger)
+                        if llm_interactive:
+                            agent.set_interceptor(create_interceptor(partial(printer, end="")))
+                        if llm_use_cache:
+                            agent.set_cache_path(cache_path / "prompter" / llm_model_name)
+                        agent.set_tag(tag)
                         agent.add_message(
-                            f"Here is the readme file of the package's GitHub repository:"
-                            f"\n{delimit_code(readme, "markdown")}"
+                            list_text(
+                                f"You are an autonomous agent and Node expert.",
+                                f"The user is a program that can only interact with you in predetermined ways.",
+                                f"The user will give you a task and instructions on how to complete the task.",
+                                f"You should try to achieve the task by following the instructions of the user."
+                            ),
+                            role="developer"
                         )
-                    if package_json:
                         agent.add_message(
-                            f"Here is the package.json file of the package's GitHub repository:"
-                            f"\n{delimit_code(package_json, "json")}"
+                            list_text(
+                                f"The npm package \"{package_name}\" can be imported via the CommonJS module system and executed via Node.",
+                                f"Your task is to decide if the package can be used directly in Node or not because e.g. it is browser-exclusive or framework-dependent."
+                            )
                         )
-                    if main:
-                        agent.add_message(
-                            f"Here is the main file of the package's GitHub repository:"
-                            f"\n{delimit_code(main, "javascript")}"
-                        )
-                    if tests:
-                        agent.add_message(
-                            f"Here are some test files of the package's GitHub repository:"
-                            f"\n{
-                                "\n".join(f"{path}:\n{delimit_code(content, "javascript")}"
-                                for path, content in tests[:MAX_NUM_TESTS])
-                            }"
-                        )
-                    readable_logger.set_crop()
-                    choice, (explanation,) = agent.get_data(
-                            IList(
-                                "Do the following",
-                                IItem(
-                                    "think",
-                                    IData(f"Think about how to complete the current task.")
-                                ),
-                                IItem(
-                                    "choose",
-                                    IChoice(
-                                        f"Then choose exactly one of the following options",
-                                        IList(
-                                            f"If the package can be used directly in Node",
-                                            IItem("yes", IData("Explain why this is the case"))
-                                        ),
-                                        IList(
-                                            f"Otherwise",
-                                            IItem("no", IData("Explain why this is the case")),
+                        readable_logger.set_crop(MAX_NUM_MESSAGE_LINES)
+                        if readme:
+                            agent.add_message(
+                                f"Here is the readme file of the package's GitHub repository:"
+                                f"\n{delimit_code(readme, "markdown")}"
+                            )
+                        if package_json:
+                            agent.add_message(
+                                f"Here is the package.json file of the package's GitHub repository:"
+                                f"\n{delimit_code(package_json, "json")}"
+                            )
+                        if main:
+                            agent.add_message(
+                                f"Here is the main file of the package's GitHub repository:"
+                                f"\n{delimit_code(main, "javascript")}"
+                            )
+                        readable_logger.set_crop()
+                        choice, (explanation,) = agent.get_data(
+                                IList(
+                                    "Do the following",
+                                    IItem(
+                                        "think",
+                                        IData(f"Think about how to complete the current task.")
+                                    ),
+                                    IItem(
+                                        "choose",
+                                        IChoice(
+                                            f"Then choose exactly one of the following options",
+                                            IList(
+                                                f"If the package can be used directly in Node",
+                                                IItem("yes", IData("Explain why this is the case"))
+                                            ),
+                                            IList(
+                                                f"Otherwise",
+                                                IItem("no", IData("Explain why this is the case")),
+                                            )
                                         )
                                     )
                                 )
-                            )
-                        )[1]
-                    create_file(logs_path / "is_usable.txt", content=explanation)
-                match choice:
-                    case "yes":
-                        printer(f"Package is usable")
-                    case "no":
-                        printer(f"Package is not usable")
-                        raise NotNodeJSError(explanation)
+                            )[1]
+                        create_file(logs_path / "evaluation_decision.txt", content=explanation)
+                    match choice:
+                        case "yes":
+                            printer(f"Package is usable")
+                        case "no":
+                            printer(f"Package is not usable")
+                            raise NotNodeJSError(explanation)
         # Manually extract examples from the readme file of the package
         if extract_from_readme:
             with printer(f"Extracting examples from the readme file:"):
@@ -384,7 +379,7 @@ def generate_examples(
                             f"Your task is to create an example that correctly imports and uses the package to its full extent.",
                             f"Make sure that the example covers as much functionality of the package as possible.",
                             f"Make sure that the example uses CommonJS style imports and exports and includes require('{package_name}').",
-                            f"Make sure that the example does not import any other Node packages that do not come preinstalled with Node.",
+                            f"Make sure that the example does not import any other npm packages that would first need to be installed.",
                             f"Make sure that the example does not run indefinitly, e.g. in case a server gets started.",
                             f"Make sure that the example does not require user input.",
                             # f"Make sure that the example is written in ES5."
@@ -438,24 +433,23 @@ def generate_examples(
                             printer(f"Success")
                         with printer(f"Checking example {example_index}:"):
                             example_index += 1
-                            if not re.search(require_pattern, example):
-                                printer(f"Import statement missing")
+                            output = test_example(example_index, example, candidates_sub_path, examples_sub_path)
+                            if output["require"]:
                                 agent.add_message(
                                     f"Your example does not include an import statement such as require('{package_name}')."
-                                    f"\nPlease do not use any other name than exactly \"{package_name}\" in the require statements, else we can not proceed."
+                                    f"\nPlease do not use any other name than exactly \"{package_name}\" in the require statement, else we can not proceed."
                                 )
                                 continue
-                            output = test_example(example_index, example, candidates_sub_path, examples_sub_path)
                             if output["code"]:
                                 if output["timeout"]:
                                     agent.add_message(
                                         f"Running your example with Node did not finish after {execution_timeout} seconds:"
-                                        f"\n{delimit_code(output["error"], "shell")}"
+                                        f"\n{delimit_code(output["shell"], "shell")}"
                                     )
                                     continue
                                 agent.add_message(
                                     f"Running your example with Node failed with code {output["code"]}:"
-                                    f"\n{delimit_code(output["error"], "shell")}"
+                                    f"\n{delimit_code(output["shell"], "shell")}"
                                 )
                                 continue
                             break

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from io import TextIOWrapper
 import os
 from pathlib import Path
 import shutil
@@ -26,6 +27,7 @@ class Printer:
         self._new_line = True
         self.set_padding()
         self.set_verbose()
+        self.set_file()
     
     def set_verbose(self, verbose: bool = True) -> None:
         self._verbose = verbose
@@ -39,6 +41,12 @@ class Printer:
     
     def get_padding(self) -> str:
         return self._padding
+
+    def set_file(self, file_path: Optional[TextIOWrapper] = None) -> None:
+        self._file = file_path
+
+    def get_file(self) -> Optional[TextIOWrapper]:
+        return self._file
 
     def __enter__(self) -> Self:
         self._level += 1
@@ -63,6 +71,8 @@ class Printer:
         else:
             text = text.replace("\n", "\n" + self._padding * self._level)
         print(text, end="", flush=flush)
+        if self._file:
+            print(text, end="", flush=flush, file=self._file)
         return self
 
 printer = Printer()

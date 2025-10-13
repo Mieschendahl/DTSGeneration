@@ -24,9 +24,9 @@ def evaluate(
     verbose: bool = True,
     verbose_setup: bool = False,
     verbose_execution: bool = False,
-    verbose_files: bool = False,
+    verbose_files: bool = True,
     verbose_exceptions: bool = True,
-    verobse_statistics: bool = False,
+    verbose_statistics: bool = False,
     remove_cache: bool = True,
     evaluate_with_llm: bool = True,
     extract_from_readme: bool = True,
@@ -42,7 +42,7 @@ def evaluate(
             # Checking required programs and their versions
             try:
                 reproduction_data: dict = dict(
-                    python = sys.version_info[:3],
+                    python = ".".join(map(str, sys.version_info[:3])),
                     node = shell("node --version").value.strip(),
                     npm = shell("npm --version").value.strip(),
                     git = shell("git --version").value.strip(),
@@ -208,7 +208,7 @@ def evaluate(
                 relative_metrics[mode][metric] = f"{old_value:.2%}" # type:ignore
         relative_metrics_json = json.dumps(relative_metrics, indent=2, ensure_ascii=False)
         create_file(metrics_path / "realtive_metrics.json", content=relative_metrics_json)
-        if verobse_statistics:
+        if verbose_statistics:
             with printer(f"Relative metrics:"):
                 printer(relative_metrics_json)
         # Compared to combined_extraction
@@ -222,7 +222,7 @@ def evaluate(
                 base_line_metrics[mode][metric] = f"{old_value:.2%}" # type:ignore
         base_line_metrics_json = json.dumps(base_line_metrics, indent=2, ensure_ascii=False)
         create_file(metrics_path/ "base_line_metrics.json", content=base_line_metrics_json)
-        if verobse_statistics:
+        if verbose_statistics:
             with printer(f"Base line metrics:"):
                 printer(base_line_metrics_json)
         printer(f"Evaluation succeeded ({metrics["num_errors"]} errors)")
