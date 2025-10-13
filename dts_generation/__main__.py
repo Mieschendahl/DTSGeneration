@@ -3,13 +3,13 @@ from pathlib import Path
 from dts_generation._generation import generate
 from dts_generation._evaluation import evaluate
 
-if False:
+if True:
     evaluate(
         output_path=Path("output/evaluation"),
         build_path=Path("output"),
         start=0,
         length=100,
-        random_seed=12345,
+        random_seed=42,
         execution_timeout=60,
         installation_timeout=600,
         verbose=True,

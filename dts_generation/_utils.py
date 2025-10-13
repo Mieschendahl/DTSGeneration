@@ -86,9 +86,6 @@ class ShellOutput:
 class ShellError(Exception):
     pass
 
-class TimeoutError(Exception):
-    pass
-
 def shell(
     command: str,
     verbose: bool = False,

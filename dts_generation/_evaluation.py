@@ -7,7 +7,7 @@ import traceback
 from typing import Optional
 
 from dts_generation._utils import ShellError, create_dir, create_file, escape_package_name, get_children, is_empty, printer, shell, unescape_package_name
-from dts_generation._example import CommonJSUnsupportedError, NodeJSUnsupportedError, PackageDataMissingError, ReproductionError
+from dts_generation._example import CommonJSUnsupportedError, NodeJSUnsupportedError, PackageDataMissingError, PackageInstallationError, ReproductionError
 from dts_generation._comparison import build_definitely_typed
 from dts_generation._generation import generate
 
@@ -95,62 +95,65 @@ def evaluate(
                 data_path = package_path / "data"
                 create_dir(data_path, overwrite=True)
                 try:
-                    try:
-                        generate(
-                            package_name=package_name,
-                            output_path=package_path,
-                            build_path=build_path,
-                            execution_timeout=execution_timeout,
-                            installation_timeout=installation_timeout,
-                            verbose=verbose,
-                            verbose_setup=verbose_setup,
-                            verbose_execution=verbose_execution,
-                            verbose_files=verbose_files,
-                            remove_cache=False,
-                            generate_examples=True,
-                            generate_declarations=True,
-                            generate_comparisons=True,
-                            evaluate_with_llm=evaluate_with_llm,
-                            extract_from_readme=extract_from_readme,
-                            generate_with_llm=generate_with_llm,
-                            llm_model_name=llm_model_name,
-                            llm_temperature=llm_temperature,
-                            llm_verbose=llm_verbose,
-                            llm_interactive=llm_interactive,
-                            llm_use_cache=False,
-                            combine_examples=True,
-                            combined_only=True,
-                            reproduce=reproduce
-                        )
-                        create_file(data_path / "is_usable")
-                    except CommonJSUnsupportedError as e:
-                        create_file(data_path / "commonjs_unsupported")
-                        if verbose_exceptions:
-                            with printer(f"Package does not support CommonJS module system:"):
-                                printer(str(e))
-                        continue
-                    except NodeJSUnsupportedError as e:
-                        create_file(data_path / "nodejs_unsupported")
-                        if verbose_exceptions:
-                            with printer(f"Package does not support Node:"):
-                                printer(str(e))
-                        continue
-                    except PackageDataMissingError as e:
-                        create_file(data_path / "package_data_missing")
-                        if verbose_exceptions:
-                            with printer(f"Missing package data for example generation:"):
-                                printer(str(e))
-                        continue
-                    except Exception as e:
-                        create_file(data_path / "raised_error")
-                        if verbose_exceptions:
-                            with printer(f"Encountered an unexpected exception:"):
-                                printer(traceback.format_exc())
-                                printer("Waiting for input, before continuing...")
-                                input()
-                finally:
-                    if remove_cache:
-                        shutil.rmtree(package_path / "cache", ignore_errors=True)
+                    generate(
+                        package_name=package_name,
+                        output_path=package_path,
+                        build_path=build_path,
+                        execution_timeout=execution_timeout,
+                        installation_timeout=installation_timeout,
+                        verbose=verbose,
+                        verbose_setup=verbose_setup,
+                        verbose_execution=verbose_execution,
+                        verbose_files=verbose_files,
+                        remove_cache=False,
+                        generate_examples=True,
+                        generate_declarations=True,
+                        generate_comparisons=True,
+                        evaluate_with_llm=evaluate_with_llm,
+                        extract_from_readme=extract_from_readme,
+                        generate_with_llm=generate_with_llm,
+                        llm_model_name=llm_model_name,
+                        llm_temperature=llm_temperature,
+                        llm_verbose=llm_verbose,
+                        llm_interactive=llm_interactive,
+                        llm_use_cache=False,
+                        combine_examples=True,
+                        combined_only=True,
+                        reproduce=reproduce
+                    )
+                    create_file(data_path / "is_usable")
+                except CommonJSUnsupportedError as e:
+                    create_file(data_path / "commonjs_unsupported")
+                    if verbose_exceptions:
+                        with printer(f"Package does not support CommonJS module system:"):
+                            printer(str(e))
+                    continue
+                except NodeJSUnsupportedError as e:
+                    create_file(data_path / "nodejs_unsupported")
+                    if verbose_exceptions:
+                        with printer(f"Package does not support Node:"):
+                            printer(str(e))
+                    continue
+                except PackageDataMissingError as e:
+                    create_file(data_path / "package_data_missing")
+                    if verbose_exceptions:
+                        with printer(f"Missing package data for example generation:"):
+                            printer(str(e))
+                    continue
+                except PackageInstallationError as e:
+                    create_file(data_path / "package_installation_fail")
+                    if verbose_exceptions:
+                        with printer(f"Package could not be installed:"):
+                            printer(str(e))
+                    continue
+                
+                except Exception as e:
+                    create_file(data_path / "raised_error")
+                    if verbose_exceptions:
+                        with printer(f"Encountered an unexpected exception:"):
+                            printer(traceback.format_exc())
+                            printer("Waiting for input, before continuing...")
+                            input()
         sub_metrics: dict = dict(
             num_sound = 0,
             num_complete = 0,
@@ -165,6 +168,7 @@ def evaluate(
             num_not_commonjs = 0,
             num_not_nodejs = 0,
             num_package_data_missing = 0,
+            package_installation_fail = 0,
             num_errors = 0,
             num_found_repository = 0, # _found_ metrics are counted only for the usable packages
             num_found_package_json = 0,
@@ -182,6 +186,7 @@ def evaluate(
             metrics["num_not_commonjs"] += exists("commonjs_unsupported")
             metrics["num_not_nodejs"] += exists("nodejs_unsupported")
             metrics["num_package_data_missing"] += exists("package_data_missing")
+            metrics["package_installation_fail"] += exists("package_installation_fail")
             metrics["num_errors"] += exists("raised_error")
             metrics["num_found_repository"] += not exists("has_repository")
             metrics["num_found_package_json"] += exists("package.json")

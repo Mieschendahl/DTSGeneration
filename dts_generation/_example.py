@@ -7,7 +7,7 @@ import shutil
 from typing import Optional
 
 from easy_prompting.prebuilt import GPT, LogList, LogFile, LogFunc, LogReadable, Prompter, IList, IData, ICode, IChoice, IItem, delimit_code, list_text, create_interceptor, pad_text
-from dts_generation._utils import create_dir, get_children, is_empty, printer, create_file, shell
+from dts_generation._utils import ShellError, create_dir, get_children, is_empty, printer, create_file, shell
 
 MAX_NUM_MESSAGE_LINES = 3
 MAX_NUM_TESTS = 3
@@ -24,6 +24,9 @@ class CommonJSUnsupportedError(Exception):
     pass
 
 class NodeJSUnsupportedError(Exception):
+    pass
+
+class PackageInstallationError(Exception):
     pass
 
 def clone_repository(package_name: str, output_path: Path, installation_timeout: int, verbose_setup: bool) -> None:
@@ -145,17 +148,22 @@ def build_template_project(package_name: str, data_path: Path, output_path: Path
             return
         create_dir(output_path, overwrite=True)
         with printer(f"Installing packages:"):
-            if reproduce:
-                if not (data_path / "package.json").is_file() or not (data_path / "package-lock.json").is_file():
-                    raise ReproductionError("Need package.json and package-lock.json from previous build, to build template project in reproduction mode")
-                create_file(output_path / "package.json", data_path / "package.json")
-                create_file(output_path / "package-lock.json", data_path / "package-lock.json")
-                shell(f"npm ci", cwd=output_path, timeout=installation_timeout, verbose=verbose_setup)
-            else:
-                shell(f"npm install tsx typescript @types/node {package_name}", cwd=output_path, timeout=installation_timeout, verbose=verbose_setup)
-                create_file(data_path / "package.json", output_path / "package.json")
-                create_file(data_path / "package-lock.json", output_path / "package-lock.json")
-            printer(f"Success")
+            try:
+                if reproduce:
+                    if not (data_path / "package.json").is_file() or not (data_path / "package-lock.json").is_file():
+                        raise ReproductionError("Need package.json and package-lock.json from previous build, to build template project in reproduction mode")
+                    create_file(output_path / "package.json", data_path / "package.json")
+                    create_file(output_path / "package-lock.json", data_path / "package-lock.json")
+                    shell(f"npm ci", cwd=output_path, timeout=installation_timeout, verbose=verbose_setup)
+                else:
+                    shell(f"npm install tsx typescript @types/node {package_name}", cwd=output_path, timeout=installation_timeout, verbose=verbose_setup)
+                    create_file(data_path / "package.json", output_path / "package.json")
+                    create_file(data_path / "package-lock.json", output_path / "package-lock.json")
+                printer(f"Success")
+            except ShellError as e:
+                raise PackageInstallationError(f"Running \"npm install {package_name}\" failed") from e
+            except TimeoutError as e:
+                raise PackageInstallationError(f"Running \"npm install {package_name}\" failed due to a timeout after {installation_timeout} seconds") from e
 
 def combine_example_files(file_paths: list[Path], relative_path: Path) -> Optional[str]:
     with printer(f"Combining examples:"):
