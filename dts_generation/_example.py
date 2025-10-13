@@ -50,9 +50,11 @@ def clone_repository(package_name: str, output_path: Path, installation_timeout:
         github_url = "https://github.com" + url.split("github.com", 1)[-1].split(".git")[0]
         create_dir(output_path, overwrite=True)
         try:
-            shell(f"git clone --depth 1 {github_url} {output_path}", check=False, timeout=installation_timeout, verbose=verbose_setup)
+            shell(f"git clone --depth 1 {github_url} {output_path}", timeout=installation_timeout, verbose=verbose_setup)
         except ShellError as e:
             raise PackageDataMissingError(f"Git clone failed") from e
+        if is_empty(output_path):
+            raise PackageDataMissingError(f"Repository clone is empty")
         printer(f"Success")
 
 def get_package_json(output_path: Path, repository_path: Path) -> Optional[str]:
@@ -218,8 +220,6 @@ def generate_examples(
         # Gather ressources for example generation
         repository_path = cache_path / "repository"
         clone_repository(package_name, repository_path, installation_timeout, verbose_setup)
-        if is_empty(repository_path):
-            raise Exception("Repository clone failed")
         create_file(data_path / "has_repository")
         package_json = get_package_json(data_path / "package.json", repository_path)
         readme = get_readme(data_path / "README.md", repository_path)
