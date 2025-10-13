@@ -7,9 +7,6 @@ import subprocess
 import threading
 from typing import Any, Optional, Self
 
-class GenerationError(Exception):
-    pass
-
 class WithVerbose:
     def __init__(self, printer: "Printer", verbose: bool):
         self._printer = printer

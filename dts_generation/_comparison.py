@@ -7,7 +7,7 @@ from dts_generation._example import build_template_project
 
 SCRIPTS_PATH = Path(__file__).parent.parent / "assets" / "comparison"
 
-def build_definitely_typed(output_path: Path, installation_timeout: int, verbose_setup: bool) -> None:
+def build_definitely_typed(output_path: Path, installation_timeout: int, verbose_setup: bool, reproduce: bool) -> None:
     with printer(f"Cloning the DefinitelyTyped repository:"):
         if not is_empty(output_path):
             printer(f"Success (already cloned)")
@@ -18,6 +18,13 @@ def build_definitely_typed(output_path: Path, installation_timeout: int, verbose
             timeout=installation_timeout,
             verbose=verbose_setup
         )
+        if reproduce:
+            shell(
+                f"git checkout 3b48ce35f1236733d9c1940eb95e6647b8a30852", # DefinitelyTyped version that the last big evaluation was performed on
+                cwd=output_path,
+                timeout=installation_timeout,
+                verbose=verbose_setup
+            )
         printer(f"Success")
 
 def generate_comparisons(
@@ -28,12 +35,16 @@ def generate_comparisons(
     installation_timeout: int,
     verbose_setup: bool,
     verbose_execution: bool,
-    verbose_files: bool
+    verbose_files: bool,
+    reproduce: bool
 ) -> None:
     with printer(f"Generating comparisons:"):
-        build_definitely_typed(build_path / "DefinitelyTyped", installation_timeout, verbose_setup)
+        build_definitely_typed(build_path / "DefinitelyTyped", installation_timeout, verbose_setup, reproduce)
         # Setting up directory interface
         cache_path = output_path / "cache"
+        create_dir(cache_path, overwrite=False)
+        data_path = output_path / "data"
+        create_dir(data_path, overwrite=False)
         declarations_path = output_path / "declarations"
         assert declarations_path.is_dir(), "Declaration directory missing"
         playground_path = cache_path / "playground"
@@ -41,14 +52,14 @@ def generate_comparisons(
         comparisons_path = output_path / "comparisons"
         create_dir(comparisons_path, overwrite=True)
         template_path = cache_path / "template"
-        build_template_project(package_name, template_path, installation_timeout, verbose_setup)
+        build_template_project(package_name, data_path, template_path, installation_timeout, verbose_setup, reproduce)
         dt_declaration_path = build_path / "DefinitelyTyped" / "types" / escape_package_name(package_name) / "index.d.ts"
         if verbose_files:
             with printer(f"DefinitelyTyped declaration content:"):
                 printer(dt_declaration_path.read_text().strip())
         # Iterate over sub directories in the declaration directory (corresponding to the different example generation modes)
         for declarations_sub_path in get_children(declarations_path):
-            if not declarations_sub_path.is_dir():
+            if is_empty(declarations_sub_path):
                 continue
             with printer(f"Generating comparisons for \"{declarations_sub_path.name}\" mode:"):
                 children = get_children(declarations_sub_path)
@@ -83,8 +94,10 @@ def generate_comparisons(
                                 with printer(f"Comparison content:"):
                                     printer(comparison)
                             create_file(comparisons_sub_path / declaration_path.name.replace(".d.ts", ".json"), content=comparison)
-                            stats = json.loads(comparison)
-                            printer(f"Soundness: {stats["soundness"]:.0%}")
-                            printer(f"Completeness: {stats["completeness"]:.0%}")
-                            printer(f"Equivalence: {stats["equivalence"]:.0%}")
+                            comparison_json = json.loads(comparison)
+                            # Even though the values are fractions, they are not really meaningful, because they depend on the export type of the package.
+                            # What really matters is if the fraction is 100% or not.
+                            printer(f"Soundness: {comparison_json["soundness"]:.2%}")
+                            printer(f"Completeness: {comparison_json["completeness"]:.2%}")
+                            printer(f"Equivalence: {comparison_json["equivalence"]:.2%}")
                             printer(f"Success")

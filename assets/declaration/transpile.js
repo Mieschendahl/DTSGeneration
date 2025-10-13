@@ -5,14 +5,10 @@ const babel = require('@babel/core');
 async function main() {
   const argv = process.argv.slice(2);
   if (argv.length === 0) {
-    console.error('Usage: node transpile-single.cjs inputFile.js');
+    console.error('Usage: node transpile.js inputFile.js');
     process.exit(1);
   }
   const inputFile = path.resolve(argv[0]);
-  if (!/\.(mjs|cjs|js)$/.test(inputFile)) {
-    console.error('Error: Input must be a .js, .mjs, or .cjs file');
-    process.exit(1);
-  }
   let code;
   try {
     code = await fs.readFile(inputFile, 'utf8');
@@ -44,8 +40,7 @@ async function main() {
       console.error('Error: Babel produced no output');
       process.exit(1);
     }
-    const outFile = inputFile.replace(/\.(mjs|cjs)$/, '.js');
-    await fs.writeFile(outFile, result.code, 'utf8');
+    await fs.writeFile(inputFile, result.code, 'utf8');
   } catch (err) {
     console.error(`Babel error: ${err.message}`);
     process.exit(1);

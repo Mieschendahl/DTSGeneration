@@ -1,7 +1,7 @@
 from pathlib import Path
 import shutil
 
-from dts_generation._utils import GenerationError, create_dir, escape_package_name, get_children, is_empty, printer
+from dts_generation._utils import escape_package_name, printer
 from dts_generation._example import generate_examples as _generate_examples
 from dts_generation._declaration import generate_declarations as _generate_declarations
 from dts_generation._comparison import generate_comparisons as _generate_comparisons
@@ -20,7 +20,7 @@ def generate(
     generate_examples: bool = True,
     generate_declarations: bool = True,
     generate_comparisons: bool = False,
-    evaluate_package: bool = True,
+    evaluate_with_llm: bool = True,
     extract_from_readme: bool = False,
     generate_with_llm: bool = True,
     llm_model_name: str = "gpt-4o-mini",
@@ -29,9 +29,10 @@ def generate(
     llm_interactive: bool = False,
     llm_use_cache: bool = False,
     combine_examples: bool = True,
-    combined_only: bool = True
+    combined_only: bool = True,
+    reproduce: bool = False # should generally be False, if not used by evaluation in reproduction mode
 ) -> None:
-    with printer(f"Starting generation:"):
+    with printer(f"Starting generation for \"{package_name}\":"):
         try:
             with printer.with_verbose(verbose):
                 if generate_examples:
@@ -43,7 +44,7 @@ def generate(
                         verbose_setup=verbose_setup,
                         verbose_execution=verbose_execution,
                         verbose_files=verbose_files,
-                        evaluate_package=evaluate_package,
+                        evaluate_with_llm=evaluate_with_llm,
                         extract_from_readme=extract_from_readme,
                         generate_with_llm=generate_with_llm,
                         llm_model_name=llm_model_name,
@@ -52,10 +53,10 @@ def generate(
                         llm_interactive=llm_interactive,
                         llm_use_cache=llm_use_cache,
                         combine_examples=combine_examples,
-                        combined_only=combined_only
+                        combined_only=combined_only,
+                        reproduce=reproduce
                     )
                 if generate_declarations:
-                    assert build_path is not None, "Build path can not be None for declaration generation"
                     assert package_name == escape_package_name(package_name), "ts-declaration-file-generator does not support qualilfied package names"
                     # ts-declaration-file-generator also does not support ES6+, only ES5
                     _generate_declarations(
@@ -67,9 +68,9 @@ def generate(
                         verbose_setup=verbose_setup,
                         verbose_execution=verbose_execution,
                         verbose_files=verbose_files,
+                        reproduce=reproduce
                     )
                 if generate_comparisons:
-                    assert build_path is not None, "Build path can not be None for comparison generation"
                     _generate_comparisons(
                         package_name=package_name,
                         output_path=output_path,
@@ -79,10 +80,11 @@ def generate(
                         verbose_setup=verbose_setup,
                         verbose_execution=verbose_execution,
                         verbose_files=verbose_files,
+                        reproduce=reproduce
                     )
-            printer(f"Generation succeeded")
-        except GenerationError:
-            printer(f"Generation failed")
+            printer(f"Generation succeeded for \"{package_name}\"")
+        except Exception:
+            printer(f"Generation failed for \"{package_name}\"")
             raise
         finally:
             if remove_cache:

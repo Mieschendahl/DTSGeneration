@@ -7,13 +7,22 @@ import shutil
 from typing import Optional
 
 from easy_prompting.prebuilt import GPT, LogList, LogFile, LogFunc, LogReadable, Prompter, IList, IData, ICode, IChoice, IItem, delimit_code, list_text, create_interceptor, pad_text
-from dts_generation._utils import ShellOutput, create_dir, get_children, is_empty, printer, create_file, shell, GenerationError
+from dts_generation._utils import ShellOutput, create_dir, get_children, is_empty, printer, create_file, shell
 
 MAX_NUM_MESSAGE_LINES = 3
 MAX_NUM_TESTS = 3
 MAX_NUM_GENERATION_ATTEMPTS = 3
 
-class EvaluationError(GenerationError):
+class ReproductionError(Exception):
+    pass
+
+class PackageDataMissingError(Exception):
+    pass
+
+class NotCommonJSError(Exception):
+    pass
+
+class NotNodeJSError(Exception):
     pass
 
 def clone_repository(package_name: str, output_path: Path, installation_timeout: int, verbose_setup: bool) -> None:
@@ -23,20 +32,20 @@ def clone_repository(package_name: str, output_path: Path, installation_timeout:
             return
         shell_output = shell(f"npm view {package_name} repository --json", timeout=installation_timeout, verbose=verbose_setup)
         if not shell_output.value:
-            raise GenerationError(f"No npm view value found")
+            raise PackageDataMissingError(f"No npm view value found")
         try:
             repo_data = json.loads(shell_output.value)
         except Exception as e:
-            raise GenerationError(f"npm view value is invalid: {shell_output.value}") from e
+            raise PackageDataMissingError(f"npm view value is invalid: {shell_output.value}") from e
         url = repo_data.get("url", "") if isinstance(repo_data, dict) else repo_data
         if "github.com" not in url:
-            raise GenerationError(f"No GitHub URL found")
+            raise PackageDataMissingError(f"No GitHub URL found")
         github_url = "https://github.com" + url.split("github.com", 1)[-1].split(".git")[0]
         create_dir(output_path, overwrite=True)
         shell_output = shell(f"git clone --depth 1 {github_url} {output_path}", check=False, timeout=installation_timeout, verbose=verbose_setup)
         if shell_output.code:
             if shell_output.code == 128:
-                raise GenerationError(f"GitHub URL is invalid: {github_url}")
+                raise PackageDataMissingError(f"GitHub URL is invalid: {github_url}")
             else:
                 raise Exception(f"Unexpected git clone fail with exit code: {shell_output.code}")
         printer(f"Success")
@@ -113,25 +122,36 @@ def get_tests(output_path: Path, repository_path: Path) -> list[tuple[str, str]]
     printer(f"{len(tests)} test file(s) found")
     return tests
 
-def build_template_project(package_name: str, output_path: Path, installation_timeout: int, verbose_setup: bool):
+def build_template_project(package_name: str, data_path: Path, output_path: Path, installation_timeout: int, verbose_setup: bool, reproduce: bool):
     with printer(f"Building template npm project:"):
         if not is_empty(output_path):
             printer("Success (already build)")
             return
         create_dir(output_path, overwrite=True)
         with printer(f"Installing packages:"):
-            shell(f"npm install tsx typescript @types/node {package_name}", cwd=output_path, timeout=installation_timeout, verbose=verbose_setup)
+            if reproduce:
+                if not (data_path / "package.json").is_file() or not (data_path / "package-lock.json").is_file():
+                    raise ReproductionError("Need package.json and package-lock.json from previous build, to build template project in reproduction mode")
+                create_file(output_path / "package.json", data_path / "package.json")
+                create_file(output_path / "package-lock.json", data_path / "package-lock.json")
+                shell(f"npm ci", cwd=output_path, timeout=installation_timeout, verbose=verbose_setup)
+            else:
+                shell(f"npm install tsx typescript @types/node {package_name}", cwd=output_path, timeout=installation_timeout, verbose=verbose_setup)
+                create_file(data_path / "package.json", output_path / "package.json")
+                create_file(data_path / "package-lock.json", output_path / "package-lock.json")
             printer(f"Success")
 
-def combine_example_files(file_paths: list[Path]) -> str:
+def combine_example_files(file_paths: list[Path], relative_path: Path) -> Optional[str]:
     with printer(f"Combining examples:"):
+        if len(file_paths) == 0:
+            printer(f"No examples found")
+            return
         combined_parts = []
         for file_path in file_paths:
             content = file_path.read_text()
             wrapped = (
-                f"// --- Begin {file_path} ---\n"
-                f"(function() {"{\n" + pad_text(content, "  ") + "\n}"})();\n"
-                f"// --- End {file_path} ---"
+                f"// File: {file_path.relative_to(relative_path)}\n\n"
+                f"(function() {"{\n" + pad_text(content, "  ") + "\n}"})();"
             )
             combined_parts.append(wrapped)
         printer(f"Success")
@@ -145,7 +165,7 @@ def generate_examples(
     verbose_setup: bool,
     verbose_execution: bool,
     verbose_files: bool,
-    evaluate_package: bool,
+    evaluate_with_llm: bool,
     extract_from_readme: bool,
     generate_with_llm: bool,
     llm_model_name: str,
@@ -154,28 +174,74 @@ def generate_examples(
     llm_interactive: bool,
     llm_use_cache: bool, # Makes llm_temperature > 0 obsolete,
     combine_examples: bool,
-    combined_only: bool
+    combined_only: bool,
+    reproduce: bool
 ) -> None:
     with printer(f"Generating examples:"):
         llm_verbose = llm_verbose or llm_interactive
+        # Setting up directory interface
         cache_path = output_path / "cache"
+        create_dir(cache_path, overwrite=False)
+        data_path = output_path / "data"
+        create_dir(data_path, overwrite=True)
+        logs_path = output_path / "logs"
+        create_dir(logs_path, overwrite=True)
+        playground_path = cache_path / "playground"
+        create_dir(playground_path, overwrite=True)
+        examples_path = output_path / "examples"
+        create_dir(examples_path, overwrite=True)
+        candidates_path = cache_path / "candidates"
+        create_dir(candidates_path, overwrite=True)
+        template_path = cache_path / "template"
+        build_template_project(package_name, data_path, template_path, installation_timeout, verbose_setup, reproduce)
+        # Regex for checking if a basic requrie statement is used for the package
+        require_pattern = r'\brequire\s*\(\s*["\'`]' + package_name + r'["\'`]\s*\)'
+        # Defining reusable helper function for example testing
+        def test_example(example_name: int | str, example: str, candidates_path: Optional[Path] = None, examples_path: Optional[Path] = None) -> dict:
+            with printer(f"Testing example \"{example_name}.js\""):
+                if verbose_files:
+                    with printer(f"Example content:"):
+                        printer(example)
+                main_path = playground_path / "index.js"
+                if candidates_path is not None:
+                    create_file(candidates_path / f"{example_name}.js", content=example)
+                with printer(f"Checking import statements:"):
+                    if not re.search(require_pattern, example):
+                        printer(f"Fail")
+                        return dict(require=True, code=0, error="", timeout=False)
+                    printer(f"Success")
+                create_dir(playground_path, template_path, overwrite=True)
+                create_file(main_path, content=example)
+                with printer(f"Running example with Node:"):
+                    shell_output = shell(f"node {main_path.name}", cwd=playground_path, check=False, timeout=execution_timeout, verbose=verbose_execution)
+                    if shell_output.code:
+                        printer(f"Fail")
+                    else:
+                        printer(f"Success")
+                        if examples_path is not None:
+                            create_file(examples_path / f"{example_name}.js", content=example)
+                    return dict(require=False, code=shell_output.code, error=shell_output.value, timeout=shell_output.timeout)
+        # Checking if package is usable
+        with printer(f"Checking CommonJS support:"):
+            output = test_example("test_require", f"const package = require(\"{package_name}\");", cache_path / "test")
+            if output["code"]:
+                raise NotCommonJSError(f"Require statement fails on package with error:\n{pad_text(output["error"])}")
         # Gather ressources for example generation
         repository_path = cache_path / "repository"
         clone_repository(package_name, repository_path, installation_timeout, verbose_setup)
-        data_path = output_path / "data"
         package_json = get_package_json(data_path / "package.json", repository_path)
         readme = get_readme(data_path / "README.md", repository_path)
-        main = get_main(data_path / "main.js", repository_path)
+        main = get_main(data_path / "index.js", repository_path)
         tests = get_tests(data_path / "tests", repository_path)
         if not (readme or package_json or main or tests):
-            raise GenerationError("Not enough package information found")
-        # Evaluate if the package satisfies the necessary requirements
-        if evaluate_package:
-            with printer(f"Evaluating package:"):
+            raise PackageDataMissingError("Not enough package information found")
+        # Evaluate if the package satisfies the necessary requirements, such as Node, CommonJS, (potentially even ES5 compatibility)
+        if evaluate_with_llm:
+            with printer(f"Evaluating package with LLM:"):
                 readable_logger = LogReadable(LogFunc(partial(printer, end="\n\n")))
                 readable_logger.set_verbose(llm_verbose)
                 tag = "evaluation"
-                file_logger = LogFile(output_path / "logs" / f"{tag}.txt")
+                file_logger = LogFile(logs_path / f"{tag}.txt")
                 with LogList(readable_logger, file_logger) as logger:
                     model = GPT(model=llm_model_name, temperature=llm_temperature)
                     agent = Prompter(model)
@@ -196,9 +262,8 @@ def generate_examples(
                     )
                     agent.add_message(
                         list_text(
-                            f"I want to know if the npm package \"{package_name}\" supports being executed with Node.",
-                            f"Some npm packages are e.g. browser-exclusive or framework-dependent such that they can not be executed via Node.",
-                            f"Your task is to determine whether the npm package can possibly be executed via Node."
+                            f"The npm package \"{package_name}\" can be imported via the CommonJS module system and executed via Node.",
+                            f"Your task is to decide if the package can be used directly in Node or not because e.g. it is browser-exclusive or framework-dependent."
                         )
                     )
                     readable_logger.set_crop(MAX_NUM_MESSAGE_LINES)
@@ -226,7 +291,7 @@ def generate_examples(
                             }"
                         )
                     readable_logger.set_crop()
-                    choice, explanation = agent.get_data(
+                    choice, (explanation,) = agent.get_data(
                             IList(
                                 "Do the following",
                                 IItem(
@@ -236,77 +301,54 @@ def generate_examples(
                                 IItem(
                                     "choose",
                                     IChoice(
-                                        f"Then choose exactly one of the following answers",
+                                        f"Then choose exactly one of the following options",
                                         IList(
-                                            f"If the package can possibly be executed via Node",
-                                            IItem("possible", IData("Explain why it is possible"))
+                                            f"If the package can be used directly in Node",
+                                            IItem("yes", IData("Explain why this is the case"))
                                         ),
                                         IList(
                                             f"Otherwise",
-                                            IItem("impossible", IData("Explain why it is not possible")),
+                                            IItem("no", IData("Explain why this is the case")),
                                         )
                                     )
                                 )
                             )
                         )[1]
+                    create_file(logs_path / "is_usable.txt", content=explanation)
                 match choice:
-                    case "possible":
+                    case "yes":
                         printer(f"Package is usable")
-                    case "impossible":
+                    case "no":
                         printer(f"Package is not usable")
-                        raise EvaluationError(explanation)
-        # Quit if we only want to evaluate the package
-        if not (extract_from_readme or generate_with_llm):
-            return
-        # Setting up directory interface
-        playground_path = cache_path / "playground"
-        create_dir(playground_path, overwrite=True)
-        examples_path = output_path / "examples"
-        create_dir(examples_path, overwrite=True)
-        candidates_path = cache_path / "candidates"
-        create_dir(candidates_path, overwrite=True)
-        template_path = cache_path / "template"
-        build_template_project(package_name, template_path, installation_timeout, verbose_setup)
-        # Defining reusable helper function for example testing
-        def test_example(example_index: int, example: str, examples_path: Path, candidates_path: Path) -> ShellOutput:
-            with printer(f"Testing example:"):
-                if verbose_files:
-                    with printer(f"Example content:"):
-                        printer(example)
-                with printer(f"Running example with Node:"):
-                    create_file(candidates_path / f"{example_index}.js", content=example)
-                    create_dir(playground_path, template_path, overwrite=True)
-                    create_file(playground_path / "index.js", content=example)
-                    shell_output = shell(f"node index.js", cwd=playground_path, check=False, timeout=execution_timeout, verbose=verbose_execution)
-                    if shell_output.code:
-                        printer(f"Fail")
-                    else:
-                        printer(f"Success")
-                        create_file(examples_path / f"{example_index}.js", content=example)
-                    return shell_output
+                        raise NotNodeJSError(explanation)
         # Manually extract examples from the readme file of the package
         if extract_from_readme:
             with printer(f"Extracting examples from the readme file:"):
-                if not readme:
-                    raise GenerationError("Readme file missing for extraction mode")
-                examples_sub_path = examples_path / "extraction"
-                create_dir(examples_sub_path, overwrite=True)
-                candidates_sub_path = candidates_path / "extraction"
-                create_dir(candidates_sub_path, overwrite=True)
-                examples = re.findall( r"```.*?\n(.*?)```", readme, flags=re.DOTALL)
-                examples = [example.strip() for example in examples]
-                printer(f"Found {len(examples)} example(s)")
-                for example_index, example in enumerate(examples):
-                    test_example(example_index, example, examples_sub_path, candidates_sub_path)
-                if combine_examples:
-                    with printer("Combining extracted examples:"):
-                        example = combine_example_files(get_children(examples_sub_path))
-                        combined_examples_sub_path = examples_path / "combined_extraction"
-                        combined_candidates_sub_path = candidates_path / "combined_extraction"
-                        test_example(0, example, combined_examples_sub_path, combined_candidates_sub_path)
-                    if combined_only:
-                        create_dir(cache_path / "examples" / examples_sub_path.name, examples_sub_path, overwrite=True) # for debug / combining all
-                        shutil.rmtree(examples_sub_path, ignore_errors=True)
+                # if not readme:
+                #     raise PackageDataMissingError("Readme file missing for extraction mode")
+                if readme:
+                    examples_sub_path = examples_path / "extraction"
+                    create_dir(examples_sub_path, overwrite=True)
+                    candidates_sub_path = candidates_path / "extraction"
+                    create_dir(candidates_sub_path, overwrite=True)
+                    examples = re.findall( r"```.*?\n(.*?)```", readme, flags=re.DOTALL)
+                    examples = [example.strip() for example in examples]
+                    printer(f"Found {len(examples)} example(s)")
+                    for example_index, example in enumerate(examples):
+                        with printer(f"Checking example {example_index}:"):
+                            test_example(example_index, example, candidates_sub_path, examples_sub_path)
+                    if combine_examples:
+                        with printer("Combining extracted examples:"):
+                            example = combine_example_files(get_children(examples_sub_path), output_path)
+                            combined_examples_sub_path = examples_path / "combined_extraction"
+                            combined_candidates_sub_path = candidates_sub_path / "combined_extraction"
+                            if example is not None:
+                                test_example("combined_extraction", example, combined_candidates_sub_path, combined_examples_sub_path)
+                        if combined_only:
+                            create_dir(cache_path / "examples" / examples_sub_path.name, examples_sub_path, overwrite=True) # for debug / combining all
+                            shutil.rmtree(examples_sub_path, ignore_errors=True)
+                else:
+                    printer(f"No readme file available for extraction")
         # Generate examples with an LLM
         if generate_with_llm:
             with printer(f"Generating examples with LLM:"):
@@ -317,7 +359,7 @@ def generate_examples(
                 readable_logger = LogReadable(LogFunc(partial(printer, end="\n\n")))
                 readable_logger.set_verbose(llm_verbose)
                 tag = "generation"
-                file_logger = LogFile(output_path / "logs" / f"{tag}.txt")
+                file_logger = LogFile(logs_path / f"{tag}.txt")
                 with LogList(readable_logger, file_logger) as logger:
                     model = GPT(model=llm_model_name, temperature=llm_temperature)
                     agent = Prompter(model)
@@ -341,7 +383,8 @@ def generate_examples(
                             f"I want to know how to use the npm package \"{package_name}\".",
                             f"Your task is to create an example that correctly imports and uses the package to its full extent.",
                             f"Make sure that the example covers as much functionality of the package as possible.",
-                            f"Make sure that the example does not import packages that are not installed by default, except \"{package_name}\".",
+                            f"Make sure that the example uses CommonJS style imports and exports and includes require('{package_name}').",
+                            f"Make sure that the example does not import any other Node packages that do not come preinstalled with Node.",
                             f"Make sure that the example does not run indefinitly, e.g. in case a server gets started.",
                             f"Make sure that the example does not require user input.",
                             # f"Make sure that the example is written in ES5."
@@ -377,7 +420,8 @@ def generate_examples(
                     while True:
                         with printer(f"Generating example {example_index}:"):
                             if example_index > MAX_NUM_GENERATION_ATTEMPTS:
-                                raise GenerationError(f"LLM failed generating a valid example in {MAX_NUM_GENERATION_ATTEMPTS} attempt(s)")
+                                printer(f"Aborting: LLM failed generating a valid example in {MAX_NUM_GENERATION_ATTEMPTS} attempt(s)")
+                                break
                             example = agent.get_data(
                                     IList(
                                         "Do the following",
@@ -392,37 +436,48 @@ def generate_examples(
                                     )
                                 )[1]
                             printer(f"Success")
-                            shell_output = test_example(example_index, example, examples_sub_path, candidates_sub_path)
-                        example_index += 1
-                        if shell_output.code:
-                            if shell_output.timeout:
+                        with printer(f"Checking example {example_index}:"):
+                            example_index += 1
+                            if not re.search(require_pattern, example):
+                                printer(f"Import statement missing")
                                 agent.add_message(
-                                    f"Running your example with Node did not finish after {execution_timeout} seconds:"
-                                    f"\n{delimit_code(shell_output.value, "shell")}"
+                                    f"Your example does not include an import statement such as require('{package_name}')."
+                                    f"\nPlease do not use any other name than exactly \"{package_name}\" in the require statements, else we can not proceed."
                                 )
-                            else:
+                                continue
+                            output = test_example(example_index, example, candidates_sub_path, examples_sub_path)
+                            if output["code"]:
+                                if output["timeout"]:
+                                    agent.add_message(
+                                        f"Running your example with Node did not finish after {execution_timeout} seconds:"
+                                        f"\n{delimit_code(output["error"], "shell")}"
+                                    )
+                                    continue
                                 agent.add_message(
-                                    f"Running your example with Node failed with code {shell_output.code}:"
-                                    f"\n{delimit_code(shell_output.value, "shell")}"
+                                    f"Running your example with Node failed with code {output["code"]}:"
+                                    f"\n{delimit_code(output["error"], "shell")}"
                                 )
-                            continue
-                        break
+                                continue
+                            break
                 # Currently only one example is produced, so this is unecessary but more uniform.
                 # Even if multiple examples are produced, we still have to ask if we want an LLM to combine them.
                 if combine_examples:
                     with printer("Combining generated examples:"):
-                        example = combine_example_files(get_children(examples_sub_path))
+                        example = combine_example_files(get_children(examples_sub_path), output_path)
                         combined_examples_sub_path = examples_path / "combined_generation"
-                        combined_candidates_sub_path = candidates_path / "combined_generation"
-                        test_example(0, example, combined_examples_sub_path, combined_candidates_sub_path)
+                        combined_candidates_sub_path = candidates_sub_path / "combined_generation"
+                        if example is not None:
+                            test_example("combined_generation", example, combined_candidates_sub_path, combined_examples_sub_path)
                     if combined_only:
                         create_dir(cache_path / "examples" / examples_sub_path.name, examples_sub_path, overwrite=True) # for debug / combining all
                         shutil.rmtree(examples_sub_path, ignore_errors=True)
         if combine_examples and extract_from_readme and generate_with_llm:
             with printer("Combining all examples:"):
                 example = combine_example_files(
-                    get_children(cache_path / "examples" / "extraction") + get_children(cache_path / "examples" / "generation")
+                    get_children(cache_path / "examples" / "extraction") + get_children(cache_path / "examples" / "generation"),
+                    output_path
                 )
                 combined_examples_sub_path = examples_path / "combined_all"
                 combined_candidates_sub_path = candidates_path / "combined_all"
-                test_example(0, example, combined_examples_sub_path, combined_candidates_sub_path)
+                if example is not None:
+                    test_example("combined_all", example, combined_candidates_sub_path, combined_examples_sub_path)

@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "A Python project for generating and comparing TypeScript .d.ts files for NPM packages."
 authors = [{name = "Leonardo Mieschendahl", email = "miesschendahl.leonardo@gmail.com"}]
 dependencies = [
-    "openai >= 1.106.0, < 2.0.0",
+    "openai == 1.106.0",
     "easy_prompting @ git+https://github.com/TheoreticalCoder/EasyPrompting.git@v2.1.0"
 ]
 
