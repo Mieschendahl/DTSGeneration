@@ -19,10 +19,10 @@ class ReproductionError(Exception):
 class PackageDataMissingError(Exception):
     pass
 
-class NotCommonJSError(Exception):
+class CommonJSUnsupportedError(Exception):
     pass
 
-class NotNodeJSError(Exception):
+class NodeJSUnsupportedError(Exception):
     pass
 
 def clone_repository(package_name: str, output_path: Path, installation_timeout: int, verbose_setup: bool) -> None:
@@ -51,76 +51,91 @@ def clone_repository(package_name: str, output_path: Path, installation_timeout:
         printer(f"Success")
 
 def get_package_json(output_path: Path, repository_path: Path) -> Optional[str]:
-    assert repository_path.is_dir(), "Repository not found"
-    package_json_path = repository_path / "package.json"
-    if package_json_path.is_file():
-        package_json = package_json_path.read_text()
-        create_file(output_path, content=package_json)
-        printer(f"Package file found")
-        return package_json
-    printer(f"No package file found")
+    try:
+        package_json_path = repository_path / "package.json"
+        if package_json_path.is_file():
+            package_json = package_json_path.read_text()
+            create_file(output_path, content=package_json)
+            printer(f"Package file found")
+            return package_json
+        printer(f"No package file found")
+    except Exception:
+        pass
     return None
 
 def get_readme(output_path: Path, repository_path: Path) -> Optional[str]:
-    assert repository_path.is_dir(), "Repository not found"
-    for readme_path in get_children(repository_path):
-        if readme_path.is_file() and "readme" in readme_path.name.lower():
-            readme = readme_path.read_text()
-            create_file(output_path, content=readme)#
-            printer(f"Readme file found")
-            return readme_path.read_text()
-    printer(f"No readme file found")
+    try:
+        for readme_path in get_children(repository_path):
+            if readme_path.is_file() and "readme" in readme_path.name.lower():
+                readme = readme_path.read_text()
+                create_file(output_path, content=readme)#
+                printer(f"Readme file found")
+                return readme_path.read_text()
+        printer(f"No readme file found")
+    except Exception:
+        pass
     return None
 
 def get_main(output_path: Path, repository_path: Path) -> Optional[str]:
-    package_json_path = repository_path / "package.json"
-    if package_json_path.is_file():
-        # Check if package.json contains a main file reference
-        try:
-            package_json = json.loads(package_json_path.read_text())
-            main_path = repository_path / package_json["main"]
-            if main_path.is_file():
-                main = main_path.read_text()
-                create_file(output_path, content=main)
-                printer(f"Main file found")
-                return main
-        except Exception:
-            pass
-        # Fallback: search for common main file names
-        main_names = ["index.js", "index.json", "index.node"]
-        for name in main_names:
-            main_path = repository_path / name
-            if main_path.is_file():
-                main = main_path.read_text()
-                create_file(output_path, content=main)
-                printer(f"Main file found")
-                return main
-        printer(f"No main file found")
-        return None
+    try:
+        package_json_path = repository_path / "package.json"
+        if package_json_path.is_file():
+            # Check if package.json contains a main file reference
+            try:
+                package_json = json.loads(package_json_path.read_text())
+                main_path = repository_path / package_json["main"]
+                if main_path.is_file():
+                    main = main_path.read_text()
+                    create_file(output_path, content=main)
+                    printer(f"Main file found")
+                    return main
+            except Exception:
+                pass
+            # Fallback: search for common main file names
+            main_names = ["index.js", "index.json", "index.node"]
+            for name in main_names:
+                main_path = repository_path / name
+                if main_path.is_file():
+                    main = main_path.read_text()
+                    create_file(output_path, content=main)
+                    printer(f"Main file found")
+                    return main
+            printer(f"No main file found")
+    except Exception:
+        pass
+    return None
 
 def get_tests(output_path: Path, repository_path: Path) -> list[tuple[str, str]]:
-    tests = {}
-    # Check well-known test directories
-    test_dirs = ["test", "tests", "__tests__"]
-    for d in test_dirs:
-        test_path = repository_path / d
-        if test_path.is_dir():
-            for f in test_path.rglob("*.js"):
-                tests[f.relative_to(repository_path)] = f.read_text()
-            for f in test_path.rglob("*.ts"):
-                tests[f.relative_to(repository_path)] = f.read_text()
-    # Check repo for suffixes
-    test_suffixes = [".test.js", ".spec.js", ".test.ts", ".spec.ts"]
-    for suffix in test_suffixes:
-        for f in repository_path.rglob(f"*{suffix}"):
-            if f.suffix in (".js", ".ts"):
-                tests[f.relative_to(repository_path)] = f.read_text()
-    tests = [(path, content) for path, content in sorted(tests.items()) if content]
-    create_dir(output_path, overwrite=True)
-    for i, (path, content) in enumerate(tests):
-        (output_path / f"{i}.js").write_text(f"// File: {path}\n\n{content}")
-    printer(f"{len(tests)} test file(s) found")
-    return tests
+    tests_ls = []
+    try:
+        tests = {}
+        # Check well-known test directories
+        test_dirs = ["test", "tests", "__tests__"]
+        for d in test_dirs:
+            test_path = repository_path / d
+            if test_path.is_dir():
+                for f in test_path.rglob("*.js"):
+                    try:
+                        tests[f.relative_to(repository_path)] = f.read_text()
+                    except UnicodeDecodeError:
+                        pass
+        # Check repo for suffixes
+        test_suffixes = [".test.js", ".spec.js"]
+        for suffix in test_suffixes:
+            for f in repository_path.rglob(f"*{suffix}"):
+                if f.suffix ==".js":
+                    try:
+                        tests[f.relative_to(repository_path)] = f.read_text()
+                    except UnicodeDecodeError:
+                        pass
+        tests_ls = [(path, content) for path, content in sorted(tests.items()) if content]
+        create_dir(output_path, overwrite=True)
+        for i, (path, content) in enumerate(tests):
+            (output_path / f"{i}.js").write_text(f"// File: {path}\n\n{content}")
+        printer(f"{len(tests)} test file(s) found")
+    except Exception:
+        pass
+    return tests_ls
 
 def build_template_project(package_name: str, data_path: Path, output_path: Path, installation_timeout: int, verbose_setup: bool, reproduce: bool):
     with printer(f"Building template npm project:"):
@@ -185,13 +200,28 @@ def generate_examples(
         logs_path = output_path / "logs"
         create_dir(logs_path, overwrite=False)
         data_path = output_path / "data"
-        create_dir(data_path, overwrite=True)
+        create_dir(data_path, overwrite=False)
         playground_path = cache_path / "playground"
         create_dir(playground_path, overwrite=True)
         examples_path = output_path / "examples"
         create_dir(examples_path, overwrite=True)
         candidates_path = cache_path / "candidates"
         create_dir(candidates_path, overwrite=True)
+        # Gather ressources for example generation
+        repository_path = cache_path / "repository"
+        clone_repository(package_name, repository_path, installation_timeout, verbose_setup)
+        if is_empty(repository_path):
+            raise Exception("Repository clone failed")
+        create_file(data_path / "has_repository")
+        package_json = get_package_json(data_path / "package.json", repository_path)
+        readme = get_readme(data_path / "README.md", repository_path)
+        main = get_main(data_path / "index.js", repository_path)
+        tests = get_tests(data_path / "tests", repository_path)
+        if len(tests) > 0:
+            create_file(data_path / "has_tests")
+        if not (readme or package_json or main or tests):
+            raise PackageDataMissingError("Not enough package information found")
+        # Create tempalte project in which to run examples
         template_path = cache_path / "template"
         build_template_project(package_name, data_path, template_path, installation_timeout, verbose_setup, reproduce)
         # Regex for checking if a basic requrie statement is used for the package
@@ -225,16 +255,7 @@ def generate_examples(
         with printer(f"Checking CommonJS support:"):
             output = test_example("test_require", f"const package = require(\"{package_name}\");", cache_path / "test")
             if output["code"]:
-                raise NotCommonJSError(f"Require statement fails on package with error:\n{pad_text(output["shell"])}")
-        # Gather ressources for example generation
-        repository_path = cache_path / "repository"
-        clone_repository(package_name, repository_path, installation_timeout, verbose_setup)
-        package_json = get_package_json(data_path / "package.json", repository_path)
-        readme = get_readme(data_path / "README.md", repository_path)
-        main = get_main(data_path / "index.js", repository_path)
-        tests = get_tests(data_path / "tests", repository_path)
-        if not (readme or package_json or main or tests):
-            raise PackageDataMissingError("Not enough package information found")
+                raise CommonJSUnsupportedError(f"Require statement fails on package with error:\n{pad_text(output["shell"])}")
         # Evaluate if the package satisfies the necessary requirements, such as Node, CommonJS, (potentially even ES5 compatibility)
         if evaluate_with_llm:
             with printer(f"Evaluating package with LLM:"):
@@ -315,7 +336,7 @@ def generate_examples(
                             printer(f"Package is usable")
                         case "no":
                             printer(f"Package is not usable")
-                            raise NotNodeJSError(explanation)
+                            raise NodeJSUnsupportedError(explanation)
         # Manually extract examples from the readme file of the package
         if extract_from_readme:
             with printer(f"Extracting examples from the readme file:"):
