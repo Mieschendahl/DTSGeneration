@@ -34,7 +34,10 @@ def clone_repository(package_name: str, output_path: Path, installation_timeout:
         if not is_empty(output_path):
             printer(f"Success (already cloned)")
             return
-        shell_output = shell(f"npm view {package_name} repository --json", timeout=installation_timeout, verbose=verbose_setup)
+        try:
+            shell_output = shell(f"npm view {package_name} repository --json", timeout=installation_timeout, verbose=verbose_setup)
+        except ShellError as e:
+            raise PackageDataMissingError(f"npm view failed") from e
         if not shell_output.value:
             raise PackageDataMissingError(f"No npm view value found")
         try:
@@ -46,12 +49,10 @@ def clone_repository(package_name: str, output_path: Path, installation_timeout:
             raise PackageDataMissingError(f"No GitHub URL found")
         github_url = "https://github.com" + url.split("github.com", 1)[-1].split(".git")[0]
         create_dir(output_path, overwrite=True)
-        shell_output = shell(f"git clone --depth 1 {github_url} {output_path}", check=False, timeout=installation_timeout, verbose=verbose_setup)
-        if shell_output.code:
-            if shell_output.code == 128:
-                raise PackageDataMissingError(f"GitHub URL is invalid: {github_url}")
-            else:
-                raise Exception(f"Unexpected git clone fail with exit code: {shell_output.code}")
+        try:
+            shell(f"git clone --depth 1 {github_url} {output_path}", check=False, timeout=installation_timeout, verbose=verbose_setup)
+        except ShellError as e:
+            raise PackageDataMissingError(f"Git clone failed") from e
         printer(f"Success")
 
 def get_package_json(output_path: Path, repository_path: Path) -> Optional[str]:
@@ -161,9 +162,9 @@ def build_template_project(package_name: str, data_path: Path, output_path: Path
                     create_file(data_path / "package-lock.json", output_path / "package-lock.json")
                 printer(f"Success")
             except ShellError as e:
-                raise PackageInstallationError(f"Running \"npm install {package_name}\" failed") from e
+                raise PackageInstallationError(f"Running npm install {package_name} failed") from e
             except TimeoutError as e:
-                raise PackageInstallationError(f"Running \"npm install {package_name}\" failed due to a timeout after {installation_timeout} seconds") from e
+                raise PackageInstallationError(f"Running npm install {package_name} failed due to a timeout after {installation_timeout} seconds") from e
 
 def combine_example_files(file_paths: list[Path], relative_path: Path) -> Optional[str]:
     with printer(f"Combining examples:"):

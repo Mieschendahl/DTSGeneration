@@ -105,7 +105,7 @@ def evaluate(
                         verbose_setup=verbose_setup,
                         verbose_execution=verbose_execution,
                         verbose_files=verbose_files,
-                        remove_cache=False,
+                        remove_cache=remove_cache,
                         generate_examples=True,
                         generate_declarations=True,
                         generate_comparisons=True,
@@ -146,7 +146,6 @@ def evaluate(
                         with printer(f"Package could not be installed:"):
                             printer(str(e))
                     continue
-                
                 except Exception as e:
                     create_file(data_path / "raised_error")
                     if verbose_exceptions:
