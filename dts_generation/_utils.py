@@ -86,6 +86,9 @@ class ShellOutput:
 class ShellError(Exception):
     pass
 
+class ShellTimeoutError(ShellError):
+    pass
+
 def shell(
     command: str,
     verbose: bool = False,
@@ -148,7 +151,7 @@ def shell(
             t.join()
             output = ShellOutput("".join(captured), rc, timeout_error)
             if check and output.timeout:
-                raise TimeoutError(f"Timeout after {timeout}s")
+                raise ShellTimeoutError(f"Timeout after {timeout}s")
             if check and output.code != 0:
                 raise ShellError(f"Non-Zero exit: {output.code}")
             return output

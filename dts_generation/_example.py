@@ -163,8 +163,6 @@ def build_template_project(package_name: str, data_path: Path, output_path: Path
                 printer(f"Success")
             except ShellError as e:
                 raise PackageInstallationError(f"Running npm install {package_name} failed") from e
-            except TimeoutError as e:
-                raise PackageInstallationError(f"Running npm install {package_name} failed due to a timeout after {installation_timeout} seconds") from e
 
 def combine_example_files(file_paths: list[Path], relative_path: Path) -> Optional[str]:
     with printer(f"Combining examples:"):
