@@ -34,63 +34,62 @@ def generate(
 ) -> None:
     logs_path = output_path / "logs"
     create_dir(logs_path, overwrite=False)
-    with open(logs_path / "console.txt", "w") as log_file:
-        printer.set_file(log_file)
-        with printer(f"Starting generation for \"{package_name}\":"):
-            try:
-                with printer.with_verbose(verbose):
-                    if generate_examples:
-                        _generate_examples(
-                            package_name=package_name,
-                            output_path=output_path,
-                            execution_timeout=execution_timeout,
-                            installation_timeout=installation_timeout,
-                            verbose_setup=verbose_setup,
-                            verbose_execution=verbose_execution,
-                            verbose_files=verbose_files,
-                            evaluate_with_llm=evaluate_with_llm,
-                            extract_from_readme=extract_from_readme,
-                            generate_with_llm=generate_with_llm,
-                            llm_model_name=llm_model_name,
-                            llm_temperature=llm_temperature,
-                            llm_verbose=llm_verbose,
-                            llm_interactive=llm_interactive,
-                            llm_use_cache=llm_use_cache,
-                            combine_examples=combine_examples,
-                            combined_only=combined_only,
-                            reproduce=reproduce
-                        )
-                    if generate_declarations:
-                        assert package_name == escape_package_name(package_name), "ts-declaration-file-generator does not support qualilfied package names"
-                        # ts-declaration-file-generator also does not support ES6+, only ES5
-                        _generate_declarations(
-                            package_name=package_name,
-                            output_path=output_path,
-                            build_path=build_path,
-                            execution_timeout=execution_timeout,
-                            installation_timeout=installation_timeout,
-                            verbose_setup=verbose_setup,
-                            verbose_execution=verbose_execution,
-                            verbose_files=verbose_files,
-                            reproduce=reproduce
-                        )
-                    if generate_comparisons:
-                        _generate_comparisons(
-                            package_name=package_name,
-                            output_path=output_path,
-                            build_path=build_path,
-                            execution_timeout=execution_timeout,
-                            installation_timeout=installation_timeout,
-                            verbose_setup=verbose_setup,
-                            verbose_execution=verbose_execution,
-                            verbose_files=verbose_files,
-                            reproduce=reproduce
-                        )
-                printer(f"Generation succeeded for \"{package_name}\"")
-            except Exception:
-                printer(f"Generation failed for \"{package_name}\"")
-                raise
-            finally:
-                if remove_cache:
-                    shutil.rmtree(output_path / "cache", ignore_errors=True)
-                printer.set_file()
+    with open(logs_path / "shell_logs.txt", "w") as log_file:
+        with printer.with_file(log_file):
+            with printer(f"Starting generation for \"{package_name}\":"):
+                try:
+                    with printer.with_verbose(verbose):
+                        if generate_examples:
+                            _generate_examples(
+                                package_name=package_name,
+                                output_path=output_path,
+                                execution_timeout=execution_timeout,
+                                installation_timeout=installation_timeout,
+                                verbose_setup=verbose_setup,
+                                verbose_execution=verbose_execution,
+                                verbose_files=verbose_files,
+                                evaluate_with_llm=evaluate_with_llm,
+                                extract_from_readme=extract_from_readme,
+                                generate_with_llm=generate_with_llm,
+                                llm_model_name=llm_model_name,
+                                llm_temperature=llm_temperature,
+                                llm_verbose=llm_verbose,
+                                llm_interactive=llm_interactive,
+                                llm_use_cache=llm_use_cache,
+                                combine_examples=combine_examples,
+                                combined_only=combined_only,
+                                reproduce=reproduce
+                            )
+                        if generate_declarations:
+                            assert package_name == escape_package_name(package_name), "ts-declaration-file-generator does not support qualilfied package names"
+                            # ts-declaration-file-generator also does not support ES6+, only ES5
+                            _generate_declarations(
+                                package_name=package_name,
+                                output_path=output_path,
+                                build_path=build_path,
+                                execution_timeout=execution_timeout,
+                                installation_timeout=installation_timeout,
+                                verbose_setup=verbose_setup,
+                                verbose_execution=verbose_execution,
+                                verbose_files=verbose_files,
+                                reproduce=reproduce
+                            )
+                        if generate_comparisons:
+                            _generate_comparisons(
+                                package_name=package_name,
+                                output_path=output_path,
+                                build_path=build_path,
+                                execution_timeout=execution_timeout,
+                                installation_timeout=installation_timeout,
+                                verbose_setup=verbose_setup,
+                                verbose_execution=verbose_execution,
+                                verbose_files=verbose_files,
+                                reproduce=reproduce
+                            )
+                    printer(f"Generation succeeded for \"{package_name}\"")
+                except Exception:
+                    printer(f"Generation failed for \"{package_name}\"")
+                    raise
+                finally:
+                    if remove_cache:
+                        shutil.rmtree(output_path / "cache", ignore_errors=True)

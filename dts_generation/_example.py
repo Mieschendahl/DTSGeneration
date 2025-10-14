@@ -338,7 +338,7 @@ def generate_examples(
                                     )
                                 )
                             )[1]
-                        create_file(logs_path / "evaluation_decision.txt", content=explanation)
+                        create_file(logs_path / "decision.txt", content=explanation)
                     match choice:
                         case "yes":
                             printer(f"Package is usable")
@@ -461,8 +461,8 @@ def generate_examples(
                                 )[1]
                             printer(f"Success")
                         with printer(f"Checking example {example_index}:"):
-                            example_index += 1
                             output = test_example(example_index, example, candidates_sub_path, examples_sub_path)
+                            example_index += 1
                             if output["require"]:
                                 agent.add_message(
                                     f"Your example does not include an import statement such as require('{package_name}')."
