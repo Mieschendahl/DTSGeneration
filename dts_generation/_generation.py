@@ -31,14 +31,15 @@ def generate(
     llm_use_cache: bool = False,
     combine_examples: bool = True,
     combined_only: bool = True,
-    reproduce: bool = False # should generally be False, if not used by evaluation in reproduction mode
+    reproduce: bool = False, # should generally be False, if not used by evaluation in reproduction mode
+    overwrite: bool = True
 ) -> None:
     logs_path = output_path / "logs"
     create_dir(logs_path, overwrite=False)
     with open(logs_path / "shell.txt", "w") as log_file:
         with printer.with_file(log_file):
             with printer(f"Starting generation for \"{package_name}\":"):
-                if not is_empty(output_path / "data"):
+                if not is_empty(output_path / "data") and not overwrite:
                     printer(f"Skipping generation (already generated)")
                     return
                 create_dir(output_path, overwrite=True)

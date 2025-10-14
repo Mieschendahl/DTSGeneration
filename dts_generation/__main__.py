@@ -30,21 +30,24 @@ if True:
         wait_after_error=True
     )
 else:
-    package_name = "breeze"
+    package_name = "node-dogstatsd"
     generate(
         package_name=package_name,
-        output_path=Path("output/generation"),
+        output_path=Path(f"output/generation/{package_name}"),
         build_path=Path("output"),
         execution_timeout=60,
         installation_timeout=600,
+        remove_cache=False,
         verbose=True,
         verbose_setup=True,
         verbose_execution=True,
         verbose_files=True,
-        remove_cache=False,
-        evaluate_with_llm=True,
+        generate_examples=True,
+        generate_declarations=True,
+        generate_comparisons=True,
+        evaluate_with_llm=False,
         extract_from_readme=True,
-        generate_with_llm=True,
+        generate_with_llm=False,
         llm_model_name="gpt-4o-mini",
         llm_temperature=0,
         llm_verbose=True,

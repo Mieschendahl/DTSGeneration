@@ -1,7 +1,6 @@
 import json
 from pathlib import Path
 import random
-import shutil
 import sys
 import traceback
 from typing import Optional
@@ -36,7 +35,8 @@ def evaluate(
     llm_verbose: bool = False,
     llm_interactive: bool = False,
     reproduce: bool = False,
-    wait_after_error: bool = True
+    wait_after_error: bool = True,
+    overwrite: bool = False
 ) -> None:
     logs_path = output_path / "logs"
     create_dir(logs_path, overwrite=False)
@@ -122,7 +122,8 @@ def evaluate(
                                 llm_use_cache=False,
                                 combine_examples=True,
                                 combined_only=True,
-                                reproduce=reproduce
+                                reproduce=reproduce,
+                                overwrite=overwrite
                             )
                         except CommonJSUnsupportedError as e:
                             if verbose_exceptions:
