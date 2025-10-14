@@ -40,13 +40,13 @@ def evaluate(
 ) -> None:
     logs_path = output_path / "logs"
     create_dir(logs_path, overwrite=False)
-    with open(uniquify_path(logs_path / "shell_logs.txt"), "w") as log_file:
+    with open(uniquify_path(logs_path / "shell.txt"), "w") as log_file:
         with printer.with_file(log_file):
             with printer("Starting evaluation:"):
                 with printer.with_verbose(verbose):
                     # Checking required programs and their versions
                     try:
-                        reproduction_data: dict = dict(
+                        reproduction: dict = dict(
                             python = ".".join(map(str, sys.version_info[:3])),
                             node = shell("node --version").value.strip(),
                             npm = shell("npm --version").value.strip(),
@@ -58,22 +58,24 @@ def evaluate(
                         )
                     except ShellError as e:
                         raise ReproductionError("Missing required shell program for evaluation") from e
-                    reproduction_path = output_path / "reproduction"
-                    create_dir(reproduction_path, overwrite=False)
+                    reproduction_path = output_path / "reproduction" / "reproduction.json"
+                    create_dir(reproduction_path.parent, overwrite=False)
                     if reproduce:
-                        saved_reproduction_data = json.loads((reproduction_path / "reproduction.json").read_text())
-                        for key, old_value in saved_reproduction_data.items():
-                            new_value = reproduction_data[key]
+                        if not reproduction_path.is_file():
+                            raise ReproductionError(f"Missing old reproduction file for version comparison")
+                        saved_reproduction = json.loads(reproduction_path.read_text())
+                        for key, old_value in saved_reproduction.items():
+                            new_value = reproduction[key]
                             if old_value != new_value:
                                 if key not in VERSION_INSENSITIVE_PROGRAMS:
                                     raise ReproductionError(f"Current {key} version is {new_value} which does not match old {key} version {old_value}")
                                 printer(f"Reproduction mode warning: Current {key} version is {new_value} which does not match old {key} version {old_value}")
                     else:
-                        reproduction_data_json = json.dumps(reproduction_data, indent=2, ensure_ascii=False)
-                        create_file(reproduction_path / "reproduction.json", content=reproduction_data_json)
+                        reproduction_json = json.dumps(reproduction, indent=2, ensure_ascii=False)
+                        create_file(reproduction_path, content=reproduction_json)
                         if verbose_setup:
                             with printer(f"Reproduction data:"):
-                                printer(reproduction_data_json)
+                                printer(reproduction_json)
                     # Gathering packages to evaluate
                     dt_path = build_path / "DefinitelyTyped"
                     build_definitely_typed(dt_path, installation_timeout, verbose_setup, reproduce)
@@ -95,12 +97,6 @@ def evaluate(
                 for i, package_name in enumerate(package_names_subset):
                     with printer(f"Evaluating package \"{package_name}\" (seed: {random_seed}) (index: {i+start}):"):
                         package_path = output_path / "packages" / escape_package_name(package_name)
-                        if not is_empty(package_path):
-                            printer(f"Skipping evaluation (already evaluated)")
-                            continue
-                        create_dir(package_path, overwrite=True)
-                        data_path = package_path / "data"
-                        create_dir(data_path, overwrite=True)
                         try:
                             generate(
                                 package_name=package_name,
@@ -128,33 +124,27 @@ def evaluate(
                                 combined_only=True,
                                 reproduce=reproduce
                             )
-                            create_file(data_path / "is_usable")
                         except CommonJSUnsupportedError as e:
-                            create_file(data_path / "commonjs_unsupported")
                             if verbose_exceptions:
                                 with printer(f"Package does not support CommonJS module system:"):
                                     printer(str(e))
                             continue
                         except NodeJSUnsupportedError as e:
-                            create_file(data_path / "nodejs_unsupported")
                             if verbose_exceptions:
                                 with printer(f"Package does not support Node:"):
                                     printer(str(e))
                             continue
                         except PackageDataMissingError as e:
-                            create_file(data_path / "package_data_missing")
                             if verbose_exceptions:
                                 with printer(f"Missing package data for example generation:"):
                                     printer(str(e))
                             continue
                         except PackageInstallationError as e:
-                            create_file(data_path / "package_installation_fail")
                             if verbose_exceptions:
                                 with printer(f"Package could not be installed:"):
                                     printer(str(e))
                             continue
                         except Exception as e:
-                            create_file(data_path / "raised_error")
                             if verbose_exceptions:
                                 with printer(f"Encountered an unexpected exception:"):
                                     printer(traceback.format_exc(), end="")
@@ -165,6 +155,7 @@ def evaluate(
                                     except (KeyboardInterrupt, EOFError):
                                         printer(" User aborted")
                                         exit(0)
+                            continue
                 sub_metrics: dict = dict(
                     num_sound = 0,
                     num_complete = 0,

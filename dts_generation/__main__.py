@@ -30,7 +30,7 @@ if True:
         wait_after_error=True
     )
 else:
-    package_name = "lodash.padend"
+    package_name = "breeze"
     generate(
         package_name=package_name,
         output_path=Path("output/generation"),

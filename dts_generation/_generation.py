@@ -1,8 +1,8 @@
 from pathlib import Path
 import shutil
 
-from dts_generation._utils import create_dir, escape_package_name, printer
-from dts_generation._example import generate_examples as _generate_examples
+from dts_generation._utils import create_dir, create_file, escape_package_name, is_empty, printer
+from dts_generation._example import CommonJSUnsupportedError, NodeJSUnsupportedError, PackageInstallationError, PackageDataMissingError, generate_examples as _generate_examples
 from dts_generation._declaration import generate_declarations as _generate_declarations
 from dts_generation._comparison import generate_comparisons as _generate_comparisons
 
@@ -34,9 +34,15 @@ def generate(
 ) -> None:
     logs_path = output_path / "logs"
     create_dir(logs_path, overwrite=False)
-    with open(logs_path / "shell_logs.txt", "w") as log_file:
+    with open(logs_path / "shell.txt", "w") as log_file:
         with printer.with_file(log_file):
             with printer(f"Starting generation for \"{package_name}\":"):
+                if not is_empty(output_path / "data"):
+                    printer(f"Skipping generation (already generated)")
+                    return
+                create_dir(output_path, overwrite=True)
+                data_path = output_path / "data"
+                create_dir(data_path, overwrite=True)
                 try:
                     with printer.with_verbose(verbose):
                         if generate_examples:
@@ -86,8 +92,26 @@ def generate(
                                 verbose_files=verbose_files,
                                 reproduce=reproduce
                             )
-                    printer(f"Generation succeeded for \"{package_name}\"")
+                            create_file(data_path / "is_usable")
+                            printer(f"Generation succeeded for \"{package_name}\"")
+                except CommonJSUnsupportedError:
+                    create_file(data_path / "commonjs_unsupported")
+                    printer(f"Generation failed for \"{package_name}\"")
+                    raise
+                except NodeJSUnsupportedError:
+                    create_file(data_path / "nodejs_unsupported")
+                    printer(f"Generation failed for \"{package_name}\"")
+                    raise
+                except PackageDataMissingError:
+                    create_file(data_path / "package_data_missing")
+                    printer(f"Generation failed for \"{package_name}\"")
+                    raise
+                except PackageInstallationError:
+                    create_file(data_path / "package_installation_fail")
+                    printer(f"Generation failed for \"{package_name}\"")
+                    raise
                 except Exception:
+                    create_file(data_path / "raised_error")
                     printer(f"Generation failed for \"{package_name}\"")
                     raise
                 finally:
