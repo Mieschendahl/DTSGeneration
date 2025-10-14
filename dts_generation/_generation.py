@@ -39,7 +39,7 @@ def generate(
     with open(logs_path / "shell.txt", "w") as log_file:
         with printer.with_file(log_file):
             with printer(f"Starting generation for \"{package_name}\":"):
-                if not is_empty(output_path / "data") and not overwrite:
+                if not overwrite and not is_empty(output_path / "data"):
                     printer(f"Skipping generation (already generated)")
                     return
                 create_dir(output_path, overwrite=True)

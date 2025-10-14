@@ -37,6 +37,18 @@ function isSubModule(
   }
 }
 
+function getRootModuleSymbol(sourceFile: ts.SourceFile, checker: ts.TypeChecker): ts.Symbol | undefined {
+  const fileSymbol = checker.getSymbolAtLocation(sourceFile);
+  if (fileSymbol) {
+    return fileSymbol;
+  }
+  for (const stmt of sourceFile.statements) {
+    if (ts.isModuleDeclaration(stmt) && ts.isStringLiteral(stmt.name)) {
+      return checker.getSymbolAtLocation(stmt.name);
+    }
+  }
+}
+
 function main() {
     const filePathA = "./predicted.d.ts";
     const filePathB = "./expected.d.ts";
@@ -45,8 +57,8 @@ function main() {
     const sourceFileA = program.getSourceFile(filePathA);
     const sourceFileB = program.getSourceFile(filePathB);
     if (!sourceFileA || !sourceFileB) throw Error("Source files not found");
-    const sourceSymbolA = checker.getSymbolAtLocation(sourceFileA);
-    const sourceSymbolB = checker.getSymbolAtLocation(sourceFileB);
+    const sourceSymbolA = getRootModuleSymbol(sourceFileA, checker);
+    const sourceSymbolB = getRootModuleSymbol(sourceFileB, checker);
     if (!sourceSymbolA || !sourceSymbolB) throw Error("Symbol not found");
     const resultA = isSubModule(checker, sourceSymbolA, sourceSymbolB);
     const resultB = isSubModule(checker, sourceSymbolB, sourceSymbolA);

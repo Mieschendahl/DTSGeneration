@@ -27,7 +27,8 @@ if True:
         llm_verbose=False,
         llm_interactive=False,
         reproduce=False,
-        wait_after_error=True
+        wait_after_error=True,
+        overwrite=False
     )
 else:
     package_name = "node-dogstatsd"
@@ -52,5 +53,6 @@ else:
         llm_temperature=0,
         llm_verbose=True,
         llm_interactive=False,
-        reproduce=False
+        reproduce=False,
+        overwrite=True
     )
