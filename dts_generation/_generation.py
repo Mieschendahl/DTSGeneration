@@ -1,5 +1,6 @@
 from pathlib import Path
 import shutil
+import traceback
 
 from dts_generation._utils import create_dir, create_file, escape_package_name, is_empty, printer
 from dts_generation._example import CommonJSUnsupportedError, NodeJSUnsupportedError, PackageInstallationError, PackageDataMissingError, generate_examples as _generate_examples
@@ -95,23 +96,23 @@ def generate(
                             create_file(data_path / "is_usable")
                             printer(f"Generation succeeded for \"{package_name}\"")
                 except CommonJSUnsupportedError:
-                    create_file(data_path / "commonjs_unsupported")
+                    create_file(data_path / "commonjs_unsupported", content=traceback.format_exc())
                     printer(f"Generation failed for \"{package_name}\"")
                     raise
                 except NodeJSUnsupportedError:
-                    create_file(data_path / "nodejs_unsupported")
+                    create_file(data_path / "nodejs_unsupported", content=traceback.format_exc())
                     printer(f"Generation failed for \"{package_name}\"")
                     raise
                 except PackageDataMissingError:
-                    create_file(data_path / "package_data_missing")
+                    create_file(data_path / "package_data_missing", content=traceback.format_exc())
                     printer(f"Generation failed for \"{package_name}\"")
                     raise
                 except PackageInstallationError:
-                    create_file(data_path / "package_installation_fail")
+                    create_file(data_path / "package_installation_fail", content=traceback.format_exc())
                     printer(f"Generation failed for \"{package_name}\"")
                     raise
                 except Exception:
-                    create_file(data_path / "raised_error")
+                    create_file(data_path / "raised_error", content=traceback.format_exc())
                     printer(f"Generation failed for \"{package_name}\"")
                     raise
                 finally:
