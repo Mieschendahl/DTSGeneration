@@ -200,7 +200,7 @@ def generate_examples(
                                                 f"Choose one of the following options",
                                                 IList(
                                                     f"If the package is not ment to be used as a stand alone package in Node e.g."
-                                                    f" because it is browser-exclusive, framework-dependent, or requires additional packages to be installed.",
+                                                    f"\nbecause it is browser-exclusive, framework-dependent, or requires additional packages to be installed.",
                                                     IItem(
                                                         "unusable",
                                                         IData(f"Explain why this is the case")
@@ -217,11 +217,11 @@ def generate_examples(
                                         )
                                     )
                                 )[1]
-                            if choice == "unsusable":
+                            if choice == "unusable":
                                 save_data(data_json_path, "llm_rejected", True, raise_missing=True)
                                 explanation = data[0]
                                 create_file(logs_path / f"llm_rejected.txt", content=explanation)
-                                printer(f"Fail (package is unusable)")
+                                printer(f"Fail (LLM rejected package)")
                                 return None
                             example = data[0]
                             printer(f"Success")
