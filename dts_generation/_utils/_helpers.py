@@ -1,6 +1,7 @@
+import json
 from pathlib import Path
 import shutil
-from typing import Optional
+from typing import Any, Optional
 
 def create_dir(dst_path: Path, src_path: Optional[Path] = None, overwrite: bool = False) -> None:
     if overwrite:
@@ -51,3 +52,22 @@ def make_path_name_unique(path: Path) -> Path:
         path = path.parent / f"{stem}_{index}{suffix}"
         index += 1
     return path
+
+def load_data(file_path: Path, key: str, default: Any = None, raise_missing: bool = True) -> Any:
+    data = {}
+    if file_path.is_file():
+        data = json.loads(file_path.read_text())
+    if raise_missing and key not in data:
+        raise KeyError(f"Key {key!r} not found at {file_path}")
+    return data.get(key, default)
+
+def save_data(file_path: Path, key: str, value: Any, raise_missing: bool = False, raise_overwrite: bool = False) -> None:
+    data = {}
+    if file_path.is_file():
+        data = json.loads(file_path.read_text())
+    if raise_missing and key not in data:
+        raise KeyError(f"Key {key!r} not found at {file_path}")
+    if raise_overwrite:
+        raise KeyError(f"Key {key!r} already exists at {file_path}") 
+    data[key] = value
+    file_path.write_text(json.dumps(data, indent=2, ensure_ascii=False))

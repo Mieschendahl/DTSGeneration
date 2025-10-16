@@ -31,30 +31,31 @@ def generate_examples(
     llm_verbose = llm_verbose or llm_interactive
     with printer(f"Generating examples:"):
         data_path = generation_path / DATA_PATH
+        data_json_path = generation_path / DATA_JSON_PATH
         logs_path = generation_path / LOGS_PATH
         examples_path = generation_path / EXAMPLES_PATH
         template_path = generation_path / TEMPLATE_PATH
         playground_path = generation_path / PLAYGROUND_PATH
-        # Get package data
         clone_repository(package_name, generation_path, verbose_setup)
-        package_json = get_package_json(generation_path)
-        readme = get_readme(generation_path)
-        main = get_main(generation_path)
-        tests = get_tests(generation_path)
-        if not dir_empty(generation_path / REPOSITORY_PATH):
-            create_file(data_path / "found_repository")
-        if len(tests) > 0:
-            create_file(data_path / "found_tests")
-        if not (readme or package_json or main or tests):
+        package_json = get_package_json(generation_path, verbose_setup)
+        readme = get_readme(generation_path, verbose_setup)
+        main = get_main(generation_path, verbose_setup)
+        tests = get_tests(generation_path, verbose_setup)
+        save_data(data_json_path, "has_repository", not dir_empty(generation_path / REPOSITORY_PATH))
+        save_data(data_json_path, "has_package_json", file_exists(generation_path / PACKAGE_JSON_PATH))
+        save_data(data_json_path, "has_readme", file_exists(generation_path / README_PATH))
+        save_data(data_json_path, "has_main", file_exists(generation_path / MAIN_PATH))      
+        save_data(data_json_path, "has_tests", not dir_empty(generation_path / TESTS_PATH))
+        save_data(data_json_path, "llm_rejected", False)
+        if not readme and not package_json and not main and not tests:
             raise PackageDataMissingError("Not enough package information found")
-        # Create tempalte project in which to run examples
         build_template_project(package_name, generation_path, verbose_setup, reproduce)
 
         # Reusable helper function for example testing
         def run_example(example: Optional[str], example_path: Path) -> dict:
             if example is None:
                 return dict(no_example=True)
-            with printer(f"Testing example \"{example_path.name}.js\""):
+            with printer(f"Testing example {example_path.name}"):
                 if verbose_files:
                     with printer(f"Example content:"):
                         printer(example)
@@ -76,7 +77,7 @@ def generate_examples(
                     return dict(shell_code=shell_output.code, shell_output=shell_output.value, shell_timeout=shell_output.timeout)
 
         # Reusable helper function for combining examples
-        def combine_files_helper(file_paths: list[Path], relative_path: Path) -> Optional[str]:
+        def combine_files_helper(file_paths: list[Path],) -> Optional[str]:
             with printer(f"Combining examples:"):
                 if len(file_paths) == 0:
                     printer(f"No examples found")
@@ -85,7 +86,7 @@ def generate_examples(
                 for file_path in file_paths:
                     content = file_path.read_text()
                     wrapped = (
-                        f"// File: {file_path.relative_to(relative_path)}\n\n"
+                        f"// File: {file_path.relative_to(generation_path)}\n\n"
                         f"(function() {"{\n" + pad_text(content, "  ") + "\n}"})();"
                     )
                     combined_parts.append(wrapped)
@@ -114,7 +115,7 @@ def generate_examples(
                 with printer("Combining extracted examples:"):
                     combined_examples_sub_path = examples_path / COMBINED_EXTRACTION_PATH
                     create_dir(combined_examples_sub_path)
-                    combined_example = combine_files_helper(get_children(examples_sub_path), generation_path)
+                    combined_example = combine_files_helper(get_children(examples_sub_path))
                     run_example(combined_example, combined_examples_sub_path / "0.js")
 
         def generate_with_llm_helper() -> None:
@@ -217,8 +218,9 @@ def generate_examples(
                                     )
                                 )[1]
                             if choice == "unsusable":
-                                create_file(data_path / "llm_rejected")
-                                create_file(logs_path / f"llm_rejected.txt", content=data[0])
+                                save_data(data_json_path, "llm_rejected", True, raise_missing=True)
+                                explanation = data[0]
+                                create_file(logs_path / f"llm_rejected.txt", content=explanation)
                                 printer(f"Fail (package is unusable)")
                                 return None
                             example = data[0]
@@ -249,7 +251,7 @@ def generate_examples(
                 with printer("Combining generated examples:"):
                     combined_examples_sub_path = examples_path / COMBINED_GENERATION_PATH
                     create_dir(combined_examples_sub_path)
-                    combined_example = combine_files_helper(get_children(examples_sub_path), generation_path)
+                    combined_example = combine_files_helper(get_children(examples_sub_path))
                     run_example(combined_example, combined_examples_sub_path / "0.js")
 
         if extract_from_readme:
@@ -261,5 +263,5 @@ def generate_examples(
                 combined_examples_sub_path = examples_path / COMBINED_ALL_PATH
                 create_dir(combined_examples_sub_path)
                 paths = get_children(examples_path / EXTRACTION_PATH) + get_children(examples_path / GENERATION_PATH)
-                combined_example = combine_files_helper(paths, generation_path)
+                combined_example = combine_files_helper(paths)
                 run_example(combined_example, combined_examples_sub_path / "0.js")

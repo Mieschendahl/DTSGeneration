@@ -19,7 +19,7 @@ def evaluate(
     verbose_setup: bool = False,
     verbose_execution: bool = False,
     verbose_files: bool = False,
-    verbose_exceptions: bool = False,
+    interactive_exceptions: bool = True,
     verbose_statistics: bool = False,
     remove_cache: bool = True,
     extract_from_readme: bool = True,
@@ -70,7 +70,7 @@ def evaluate(
                                 printer(reproduction_json)
                     # Gathering packages to evaluate
                     build_definitely_typed(build_path, verbose_setup, reproduce)
-                    package_names = [path.name for path in get_children(build_path / DEFINITELY_TYPED_PATH / "types") if path.is_dir()]
+                    package_names = [path.name for path in get_children(build_path / DEFINITELY_TYPED_PATH / "types") if not dir_empty(path)]
                     package_names.sort()
                     # ts-declaration-file-generator currently does not qualified package names (e.g. @babel/core)
                     printer(f"Removing packages with qualified names (not supported)")
@@ -86,8 +86,8 @@ def evaluate(
                     package_names_subset = package_names[start:start+length]
                 printer(f"Evaluating {len(package_names_subset)} of {len(package_names)} packages ({start}-{start+length})")
                 for i, package_name in enumerate(package_names_subset):
-                    with printer(f"Evaluating package \"{package_name}\" (seed: {random_seed}) (index: {i+start}):"):
-                        generation_path = evaluation_path / "packages" / escape_package_name(package_name)
+                    with printer(f"Evaluating package \"{package_name}\" (index: {i+start}):"):
+                        generation_path = evaluation_path / PACKAGES_PATH / escape_package_name(package_name)
                         try:
                             generate(
                                 package_name=package_name,
@@ -113,23 +113,10 @@ def evaluate(
                                 reproduce=reproduce,
                                 overwrite=overwrite
                             )
-                        except CommonJSUnsupportedError as e:
-                            if verbose_exceptions:
-                                with printer(f"Package does not support CommonJS module system:"):
-                                    printer(str(e))
-                            continue
-                        except PackageDataMissingError as e:
-                            if verbose_exceptions:
-                                with printer(f"Missing package data for example generation:"):
-                                    printer(str(e))
-                            continue
-                        except PackageInstallationError as e:
-                            if verbose_exceptions:
-                                with printer(f"Package could not be installed:"):
-                                    printer(str(e))
-                            continue
+                        except (CommonJSUnsupportedError, PackageDataMissingError, PackageInstallationError):
+                            pass
                         except Exception as e:
-                            if verbose_exceptions:
+                            if interactive_exceptions:
                                 with printer(f"Encountered an unexpected exception:"):
                                     printer(traceback.format_exc(), end="")
                                 try:
@@ -138,7 +125,6 @@ def evaluate(
                                 except (KeyboardInterrupt, EOFError):
                                     printer(" User aborted")
                                     exit(0)
-                            continue
                 sub_metrics: dict = dict(
                     sound = 0,
                     complete = 0,
@@ -147,54 +133,51 @@ def evaluate(
                     declarations_generated = 0,
                     comparisons_generated = 0
                 )
+                packages = get_children(evaluation_path / PACKAGES_PATH)
                 metrics: dict = dict(
-                    total = len(package_names_subset),
+                    total = len(packages),
                     usable = 0,
-                    not_commonjs = 0,
-                    llm_rejected = 0,
                     package_data_missing = 0,
-                    package_installation_fail = 0,
-                    errors = 0,
-                    found_repository = 0, # _found_ metrics are counted only for the usable packages
-                    found_package_json = 0,
-                    found_readme = 0,
-                    found_main = 0,
-                    found_tests = 0,
+                    package_installation_failed = 0,
+                    commonjs_unsupported = 0,
+                    unexpected_exception = 0,
+                    llm_rejected = 0,
+                    has_repository = 0,
+                    has_package_json = 0,
+                    has_readme = 0,
+                    has_main = 0,
+                    has_tests = 0,
                     combined_extraction = sub_metrics.copy(),
                     combined_generation = sub_metrics.copy(),
                     combined_all = sub_metrics.copy()
                 )
-                for generation_path in get_children(evaluation_path / "packages"):
-                    data_path = generation_path / "data"
-                    exists = lambda name: (data_path / name).is_file()
-                    metrics["usable"] += exists("is_usable")
-                    metrics["not_commonjs"] += exists("not_commonjs")
-                    metrics["llm_rejected"] += exists("llm_rejected")
-                    metrics["package_data_missing"] += exists("package_data_missing")
-                    metrics["package_installation_fail"] += exists("package_installation_fail")
-                    metrics["errors"] += exists("raised_error")
-                    metrics["found_repository"] += not exists("has_repository")
-                    metrics["found_package_json"] += exists("package.json")
-                    metrics["found_readme"] += exists("README.md")
-                    metrics["found_main"] += exists("index.js")
-                    metrics["found_tests"] += exists("has_tests")
+                for generation_path in packages:
+                    data_json_path = generation_path / DATA_JSON_PATH
+                    metrics["usable"] += load_data(data_json_path, "usable")
+                    metrics["package_data_missing"] += load_data(data_json_path, "package_data_missing")
+                    metrics["package_installation_failed"] +=  load_data(data_json_path, "package_installation_failed")
+                    metrics["commonjs_unsupported"] += load_data(data_json_path, "commonjs_unsupported")
+                    metrics["unexpected_exception"] += load_data(data_json_path, "unexpected_exception")
+                    metrics["llm_rejected"] += load_data(data_json_path, "llm_rejected")
+                    metrics["has_repository"] += load_data(data_json_path, "has_repository")
+                    metrics["has_package_json"] += load_data(data_json_path, "has_package_json")
+                    metrics["has_readme"] += load_data(data_json_path, "has_readme")
+                    metrics["has_main"] += load_data(data_json_path, "has_main")
+                    metrics["has_tests"] += load_data(data_json_path, "has_tests")
                     for mode in COMBINED_MODE_PATHS:
-                        sub_metrics = metrics[mode]
-                        examples_sub_path = generation_path / "examples" / mode
-                        sub_metrics["examples_generated"] += not dir_empty(examples_sub_path)
-                        declarations_sub_path = generation_path / "declarations" / mode
-                        sub_metrics["declarations_generated"] += not dir_empty(declarations_sub_path)
-                        comparisons_sub_path = generation_path / "comparisons" / mode
-                        sub_metrics["comparisons_generated"] += not dir_empty(comparisons_sub_path)
-                        if not dir_empty(comparisons_sub_path):
-                            assert len(get_children(comparisons_sub_path)) == 1, "Expected only one comparison file (combined_only mode)"
-                            for comparison_path in get_children(comparisons_sub_path):
-                                comparison_json = json.loads(comparison_path.read_text())
-                                sub_metrics["sound"] += comparison_json["isSound"]
-                                sub_metrics["complete"] += comparison_json["isComplete"]
-                                sub_metrics["equivalent"] += comparison_json["isEquivalent"]
+                        sub_metrics = metrics[mode.name]
+                        sub_metrics["examples_generated"] += not dir_empty(generation_path / EXAMPLES_PATH / mode)
+                        sub_metrics["declarations_generated"] += not dir_empty(generation_path / DECLARATIONS_PATH / mode)
+                        sub_metrics["comparisons_generated"] += not dir_empty(generation_path / COMPARISONS_PATH / mode)
+                        children = get_children(generation_path / COMPARISONS_PATH / mode)
+                        assert len(children) <= 1, "Expected not more than one comparison file for combined examples"
+                        for comparison_path in children:
+                            comparison_json = json.loads(comparison_path.read_text())
+                            sub_metrics["sound"] += comparison_json["isSound"]
+                            sub_metrics["complete"] += comparison_json["isComplete"]
+                            sub_metrics["equivalent"] += comparison_json["isEquivalent"]
                 metrics_path = evaluation_path / METRICS_PATH
-                create_dir(metrics_path, overwrite=True)
+                create_dir(metrics_path)
                 metrics_json = json.dumps(metrics, indent=2, ensure_ascii=False)
                 create_file(metrics_path / "absolute_metrics.json", content=metrics_json)
                 if verbose_statistics:
@@ -207,9 +190,9 @@ def evaluate(
                     combined_all = sub_metrics.copy()
                 )
                 for mode in COMBINED_MODE_PATHS:
-                    for metric, old_value in metrics[mode].items():
+                    for metric, old_value in metrics[mode.name].items():
                         old_value = old_value / metrics["usable"] if metrics["usable"] > 0 else 1
-                        relative_metrics[mode][metric] = f"{old_value:.2%}" # type:ignore
+                        relative_metrics[mode.name][metric] = f"{old_value:.2%}" # type:ignore
                 relative_metrics_json = json.dumps(relative_metrics, indent=2, ensure_ascii=False)
                 create_file(metrics_path / "realtive_metrics.json", content=relative_metrics_json)
                 if verbose_statistics:
@@ -222,11 +205,10 @@ def evaluate(
                 )
                 for mode in COMBINED_MODE_PATHS[1:]:
                     for metric, old_value in metrics["combined_extraction"].items():
-                        old_value = (metrics[mode][metric] - old_value) / old_value if old_value > 0 else float("inf")
-                        base_line_metrics[mode][metric] = f"{old_value:.2%}" # type:ignore
+                        old_value = (metrics[mode.name][metric] - old_value) / old_value if old_value > 0 else float("inf")
+                        base_line_metrics[mode.name][metric] = f"{old_value:.2%}" # type:ignore
                 base_line_metrics_json = json.dumps(base_line_metrics, indent=2, ensure_ascii=False)
                 create_file(metrics_path/ "base_line_metrics.json", content=base_line_metrics_json)
                 if verbose_statistics:
                     with printer(f"Base line metrics:"):
                         printer(base_line_metrics_json)
-                printer(f"Evaluation succeeded ({metrics["errors"]} errors)")

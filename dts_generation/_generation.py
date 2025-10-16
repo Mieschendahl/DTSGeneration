@@ -31,18 +31,22 @@ def generate(
     llm_interactive: bool = False,
     llm_use_cache: bool = False
 ) -> None:
-    data_path = generation_path / DATA_PATH
     create_dir(generation_path, overwrite=overwrite)
-    if not dir_empty(data_path):
+    if not dir_empty(generation_path / DATA_PATH):
         printer(f"Skipping generation for \"{package_name}\" (already generated)")
         return None
-    logs_path = generation_path / LOGS_PATH
-    create_dir(generation_path / data_path)
-    create_dir(generation_path / logs_path)
+    create_dir(generation_path / DATA_PATH)
+    create_dir(generation_path / LOGS_PATH)
     create_dir(generation_path / EXAMPLES_PATH)
     create_dir(generation_path / DECLARATIONS_PATH)
     create_dir(generation_path / COMPARISONS_PATH)
-    with open(logs_path / "shell.txt", "w") as log_file:
+    data_json_path = generation_path / DATA_JSON_PATH
+    save_data(data_json_path, "usable", False)
+    save_data(data_json_path, "package_data_missing", False)
+    save_data(data_json_path, "package_installation_failed", False)
+    save_data(data_json_path, "commonjs_unsupported", False)
+    save_data(data_json_path, "unexpected_exception", False)
+    with open(generation_path / LOGS_PATH / "shell.txt", "w") as log_file:
         with printer.with_file(log_file):
             with printer(f"Starting generation for \"{package_name}\":"):
                 try:
@@ -87,23 +91,18 @@ def generate(
                                 combined_only=combined_only,
                                 reproduce=reproduce
                             )
-                            create_file(data_path / "usable")
-                            printer(f"Generation succeeded for \"{package_name}\"")
-                except CommonJSUnsupportedError:
-                    create_file(data_path / "not_commonjs", content=traceback.format_exc())
-                    printer(f"Generation failed for \"{package_name}\"")
-                    raise
+                    save_data(data_json_path, "usable", True, raise_missing=True)
                 except PackageDataMissingError:
-                    create_file(data_path / "package_data_missing", content=traceback.format_exc())
-                    printer(f"Generation failed for \"{package_name}\"")
+                    save_data(data_json_path, "package_data_missing", True, raise_missing=True)
                     raise
                 except PackageInstallationError:
-                    create_file(data_path / "package_installation_fail", content=traceback.format_exc())
-                    printer(f"Generation failed for \"{package_name}\"")
+                    save_data(data_json_path, "package_installation_failed", True, raise_missing=True)
+                    raise
+                except CommonJSUnsupportedError:
+                    save_data(data_json_path, "commonjs_unsupported", True, raise_missing=True)
                     raise
                 except Exception:
-                    create_file(data_path / "raised_error", content=traceback.format_exc())
-                    printer(f"Generation failed for \"{package_name}\"")
+                    save_data(data_json_path, "unexpected_exception", True, raise_missing=True)
                     raise
                 finally:
                     if remove_cache:

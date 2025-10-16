@@ -13,6 +13,7 @@ COMPARISON_SCRIPTS_PATH = ASSETS_PATH / "comparison"
 EVALUATION_PATH = Path("evaluation")
 PACKAGES_PATH = Path("packages")
 DATA_PATH = Path("data")
+DATA_JSON_PATH = DATA_PATH / "data.json"
 LOGS_PATH = Path("logs")
 EXAMPLES_PATH = Path("examples")
 DECLARATIONS_PATH = Path("declarations")

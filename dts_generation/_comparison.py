@@ -26,11 +26,13 @@ def generate_comparisons(
                 printer(dt_declaration_path.read_text().strip())
         for sub_path in COMBINED_MODE_PATHS if combined_only else ALL_MODE_PATHS:
             declarations_sub_path = declarations_path / sub_path
+            if dir_empty(declarations_sub_path):
+                continue
             children = get_children(declarations_sub_path)
             with printer(f"Found {len(children)} declarations(s) for {sub_path}:"):
                 if len(children) == 0:
                     printer(f"Not enough examples")
-                    return None
+                    break
                 comparisons_sub_path = comparisons_path / sub_path
                 create_dir(comparisons_sub_path)
                 for declaration_path in children:
@@ -67,4 +69,3 @@ def generate_comparisons(
                             printer(f"Soundness: {comparison_json["soundness"]:.2%}")
                             printer(f"Completeness: {comparison_json["completeness"]:.2%}")
                             printer(f"Equivalence: {comparison_json["equivalence"]:.2%}")
-                            printer(f"Success")

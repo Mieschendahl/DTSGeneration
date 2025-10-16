@@ -26,7 +26,7 @@ def generate_declarations(
         for sub_path in COMBINED_MODE_PATHS if combined_only else ALL_MODE_PATHS:
             examples_sub_path = examples_path / sub_path
             if dir_empty(examples_sub_path):
-                continue
+                break
             children = get_children(examples_sub_path)
             with printer(f"Found {len(children)} example(s) for {sub_path}:"):
                 declarations_sub_path = declarations_path / sub_path
@@ -56,12 +56,12 @@ def generate_declarations(
                             with printer(f"Transpiled example content:"):
                                 printer(main_path.read_text())
                         # Apply run time information analysis using Jalangi 2
-                        with printer(f"Running {RUN_TIME_ANALYZER}:"):
+                        with printer(f"Running {RUN_TIME_ANALYZER_PATH.name}:"):
                             if platform.system() == "Linux":
                                 script_path = DECLARATION_SCRIPTS_PATH / "getRunTimeInformation.linux.sh"
                             else:
                                 script_path = DECLARATION_SCRIPTS_PATH / "getRunTimeInformation.sh"
-                            run_time_path = playground_path / RUN_TIME_ANALYZER / "run_time_info.json"
+                            run_time_path = playground_path / RUN_TIME_ANALYZER_PATH.name / "run_time_info.json"
                             create_dir(run_time_path.parent, overwrite=True)           
                             shell_output = shell(
                                 f"{script_path} {main_path.relative_to(playground_path)} {run_time_path.relative_to(playground_path)} {EXECUTION_TIMEOUT * 2}",
@@ -75,9 +75,9 @@ def generate_declarations(
                                 continue
                             printer(f"Success")
                         # Generate .d.ts file using dts-generate
-                        with printer(f"Running {DECLARATION_GENERATOR}:"):
+                        with printer(f"Running {DECLARATION_GENERATOR_PATH.name}:"):
                             script_path = DECLARATION_SCRIPTS_PATH / "generateDeclarationFile.sh"
-                            declaration_path = playground_path / DECLARATION_GENERATOR
+                            declaration_path = playground_path / DECLARATION_GENERATOR_PATH.name
                             create_dir(declaration_path, overwrite=True)
                             shell_output = shell(
                                 f"{script_path} {run_time_path.relative_to(playground_path)} {package_name} {declaration_path.relative_to(playground_path)}",
