@@ -5,7 +5,7 @@ description = "A Python project for generating and comparing TypeScript .d.ts fi
 authors = [{name = "Leonardo Mieschendahl", email = "miesschendahl.leonardo@gmail.com"}]
 dependencies = [
     "openai == 1.106.0",
-    "easy_prompting @ git+https://github.com/TheoreticalCoder/EasyPrompting.git@v2.2.0"
+    "easy_prompting @ git+https://github.com/Mieschendahl/EasyPrompting.git@v2.2.0"
 ]
 
 [build-system]
