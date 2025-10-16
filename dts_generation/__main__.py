@@ -3,7 +3,7 @@ from pathlib import Path
 from dts_generation._generation import generate
 from dts_generation._evaluation import evaluate
 
-if True:
+if False:
     evaluate(
         output_path=Path("output/evaluation"),
         build_path=Path("output"),
@@ -19,7 +19,7 @@ if True:
         verbose_exceptions=True,
         verbose_statistics=True,
         remove_cache=True,
-        evaluate_with_llm=True,
+        evaluate_with_llm=False,
         extract_from_readme=True,
         generate_with_llm=True,
         llm_model_name="gpt-4o-mini",
@@ -31,22 +31,19 @@ if True:
         overwrite=False
     )
 else:
-    package_name = "node-dogstatsd"
+    package_name = "breeze"
     generate(
         package_name=package_name,
-        output_path=Path(f"output/generation/{package_name}"),
+        generation_path=Path(f"output/generation/{package_name}"),
         build_path=Path("output"),
-        execution_timeout=60,
-        installation_timeout=600,
         remove_cache=False,
         verbose=True,
         verbose_setup=True,
         verbose_execution=True,
-        verbose_files=True,
+        verbose_files=False,
         generate_examples=True,
         generate_declarations=True,
         generate_comparisons=True,
-        evaluate_with_llm=False,
         extract_from_readme=True,
         generate_with_llm=False,
         llm_model_name="gpt-4o-mini",
@@ -54,5 +51,7 @@ else:
         llm_verbose=True,
         llm_interactive=False,
         reproduce=False,
-        overwrite=True
+        overwrite=True,
+        combine_examples=True,
+        combined_only=True
     )

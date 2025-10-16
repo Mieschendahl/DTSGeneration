@@ -1,71 +1,38 @@
 import json
 from pathlib import Path
-from typing import Optional
 
-from dts_generation._utils import create_dir, create_file, get_children, shell, printer, escape_package_name, is_empty
-from dts_generation._example import build_template_project
-
-SCRIPTS_PATH = Path(__file__).parent.parent / "assets" / "comparison"
-
-def build_definitely_typed(output_path: Path, installation_timeout: int, verbose_setup: bool, reproduce: bool) -> None:
-    with printer(f"Cloning the DefinitelyTyped repository:"):
-        if not is_empty(output_path):
-            printer(f"Success (already cloned)")
-            return
-        create_dir(output_path, overwrite=True)
-        shell(
-            f"git clone --depth 1 https://github.com/DefinitelyTyped/DefinitelyTyped.git {output_path}",
-            timeout=installation_timeout,
-            verbose=verbose_setup
-        )
-        if reproduce:
-            shell(
-                f"git checkout 3b48ce35f1236733d9c1940eb95e6647b8a30852", # DefinitelyTyped version that the last big evaluation was performed on
-                cwd=output_path,
-                timeout=installation_timeout,
-                verbose=verbose_setup
-            )
-        printer(f"Success")
+from dts_generation._utils import *
 
 def generate_comparisons(
     package_name: str,
-    output_path: Path,
+    generation_path: Path,
     build_path: Path,
-    execution_timeout: int,
-    installation_timeout: int,
     verbose_setup: bool,
     verbose_execution: bool,
     verbose_files: bool,
+    combined_only: bool,
     reproduce: bool
 ) -> None:
     with printer(f"Generating comparisons:"):
-        build_definitely_typed(build_path / "DefinitelyTyped", installation_timeout, verbose_setup, reproduce)
-        # Setting up directory interface
-        cache_path = output_path / "cache"
-        create_dir(cache_path, overwrite=False)
-        data_path = output_path / "data"
-        create_dir(data_path, overwrite=False)
-        declarations_path = output_path / "declarations"
-        assert declarations_path.is_dir(), "Declaration directory missing"
-        playground_path = cache_path / "playground"
-        create_dir(playground_path, overwrite=True)
-        comparisons_path = output_path / "comparisons"
-        create_dir(comparisons_path, overwrite=True)
-        template_path = cache_path / "template"
-        build_template_project(package_name, data_path, template_path, installation_timeout, verbose_setup, reproduce)
-        dt_declaration_path = build_path / "DefinitelyTyped" / "types" / escape_package_name(package_name) / "index.d.ts"
+        declarations_path = generation_path / DECLARATIONS_PATH
+        comparisons_path = generation_path / COMPARISONS_PATH
+        template_path = generation_path / TEMPLATE_PATH
+        playground_path = generation_path / PLAYGROUND_PATH
+        build_definitely_typed(build_path, verbose_setup, reproduce)
+        build_template_project(package_name, generation_path, verbose_setup, reproduce)
+        dt_declaration_path = build_path / DEFINITELY_TYPED_PATH / "types" / escape_package_name(package_name) / "index.d.ts"
         if verbose_files:
             with printer(f"DefinitelyTyped declaration content:"):
                 printer(dt_declaration_path.read_text().strip())
-        # Iterate over sub directories in the declaration directory (corresponding to the different example generation modes)
-        for declarations_sub_path in get_children(declarations_path):
-            if is_empty(declarations_sub_path):
-                continue
-            with printer(f"Generating comparisons for \"{declarations_sub_path.name}\" mode:"):
-                children = get_children(declarations_sub_path)
-                printer(f"Found {len(children)} declaration(s)")
-                comparisons_sub_path = comparisons_path / declarations_sub_path.name
-                create_dir(comparisons_sub_path, overwrite=True)
+        for sub_path in COMBINED_MODE_PATHS if combined_only else ALL_MODE_PATHS:
+            declarations_sub_path = declarations_path / sub_path
+            children = get_children(declarations_sub_path)
+            with printer(f"Found {len(children)} declarations(s) for {sub_path}:"):
+                if len(children) == 0:
+                    printer(f"Not enough examples")
+                    return None
+                comparisons_sub_path = comparisons_path / sub_path
+                create_dir(comparisons_sub_path)
                 for declaration_path in children:
                     with printer(f"Generating comparison for {declaration_path.name}:"):
                         if verbose_files:
@@ -73,8 +40,8 @@ def generate_comparisons(
                                 printer(declaration_path.read_text())
                         create_dir(playground_path, template_path, overwrite=True)
                         create_file(playground_path / "index.d.ts", declaration_path)
-                        create_file(playground_path / "compare.ts", SCRIPTS_PATH / "compare.ts")
-                        create_file(playground_path / "tsconfig.json", SCRIPTS_PATH / "tsconfig.json")
+                        create_file(playground_path / "compare.ts", COMPARISON_SCRIPTS_PATH / "compare.ts")
+                        create_file(playground_path / "tsconfig.json", COMPARISON_SCRIPTS_PATH / "tsconfig.json")
                         create_file(playground_path / "predicted.d.ts", declaration_path)
                         create_file(playground_path / "expected.d.ts", dt_declaration_path)
                         with printer(f"Comparing generated declaration to DefinitelyTyped declaration:"):
@@ -82,7 +49,7 @@ def generate_comparisons(
                                 f"npx tsx compare.ts",
                                 cwd=playground_path,
                                 check=False,
-                                timeout=execution_timeout,
+                                timeout=EXECUTION_TIMEOUT,
                                 verbose=verbose_execution
                             )
                             comparison_path = playground_path / "comparison.json"
