@@ -42,6 +42,7 @@ function getRootModuleSymbol(sourceFile: ts.SourceFile, checker: ts.TypeChecker)
   if (fileSymbol) {
     return fileSymbol;
   }
+  // TODO: implement more advanced module declaration searching
   // for (const stmt of sourceFile.statements) {
   //   if (ts.isModuleDeclaration(stmt) && ts.isStringLiteral(stmt.name)) {
   //     return checker.getSymbolAtLocation(stmt.name);

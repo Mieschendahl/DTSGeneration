@@ -233,19 +233,21 @@ def get_tests(generation_path: Path, verbose_setup: bool) -> list[tuple[str, str
             test_path = repository_path / d
             if test_path.is_dir():
                 for f in test_path.rglob("*.js"):
-                    try:
-                        tests[f.relative_to(repository_path)] = f.read_text()
-                    except UnicodeDecodeError:
-                        pass
+                    if f.is_file():
+                        try:
+                            tests[f.relative_to(repository_path)] = f.read_text()
+                        except UnicodeDecodeError:
+                            pass
         # Check repo for suffixes
         test_suffixes = [".test.js", ".spec.js"]
         for suffix in test_suffixes:
             for f in repository_path.rglob(f"*{suffix}"):
                 if f.suffix ==".js":
-                    try:
-                        tests[f.relative_to(repository_path)] = f.read_text()
-                    except UnicodeDecodeError:
-                        pass
+                    if f.is_file():
+                        try:
+                            tests[f.relative_to(repository_path)] = f.read_text()
+                        except UnicodeDecodeError:
+                            pass
         tests = [(path, content) for path, content in sorted(tests.items()) if content]
         for i, (path, content) in enumerate(tests):
             (output_path / f"{i}.js").write_text(f"// File: {path}\n\n{content}")
