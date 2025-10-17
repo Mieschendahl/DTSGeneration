@@ -8,7 +8,7 @@ if True:
         evaluation_path=Path("output/evaluation"),
         build_path=Path("output"),
         start=0,
-        length=3,
+        length=100,
         random_seed=50,
         verbose=True,
         verbose_setup=True,

@@ -140,7 +140,7 @@ def generate_examples(
                     agent.set_tag(GENERATION_PATH.name)
                     agent.add_message(
                         list_text(
-                            f"You are an autonomous agent and Node expert.",
+                            f"You are an autonomous agent and JavaScript/Node/NPM expert.",
                             f"The user is a program that can only interact with you in predetermined ways.",
                             f"The user will give you a task and instructions on how to complete the task.",
                             f"You should try to achieve the task by following the instructions of the user."
@@ -149,13 +149,15 @@ def generate_examples(
                     )
                     agent.add_message(
                         list_text(
-                            f"I want to know how to use the npm package \"{package_name}\".",
-                            f"Your task is to create an example that correctly imports and uses the package to its full extent.",
-                            f"Make sure that the example covers as much functionality of the package as possible.",
-                            f"Make sure that the example uses CommonJS style imports and exports and includes require('{package_name}').",
-                            f"Make sure that the example does not import any other npm packages that would first need to be installed.",
-                            f"Make sure that the example does not run indefinitly, e.g. in case a server gets started.",
-                            f"Make sure that the example does not require user input.",
+                            f"Your task is to create an example that correctly imports and uses the npm package \"{package_name}\".",
+                            f"The example should"
+                            +
+                            list_text(
+                                f"Cover all possible valid use cases such that I can use the example to infer the type declarations of the package.",
+                                f"Use CommonJS imports and exports.",
+                                f"Does not wait for user inputs and does not run indefinitely e.g. if it runs a server.",
+                                add_scope=True
+                            )
                         )
                     )
                     # Crop long messages for print readability
@@ -196,7 +198,7 @@ def generate_examples(
                                         "Do the following",
                                         IItem(
                                             "think",
-                                            IData(f"Think about how to complete the current task.")
+                                            IData(f"Think about how to complete the current task given by the user.")
                                         ),
                                         IItem(
                                             "choose",
@@ -204,9 +206,9 @@ def generate_examples(
                                                 f"Choose one of the following options",
                                                 IList(
                                                     f"If the package is not ment to be used as a stand alone package in Node e.g."
-                                                    f"\nbecause it is browser-exclusive, framework-dependent, or requires additional packages to be installed.",
+                                                    f"\nbecause it is browser-exclusive, framework-dependent, or requires additional npm packages to be installed.",
                                                     IItem(
-                                                        "unusable",
+                                                        "reject",
                                                         IData(f"Explain why this is the case")
                                                     )
                                                 ),
@@ -221,7 +223,7 @@ def generate_examples(
                                         )
                                     )
                                 )[1]
-                            if choice == "unusable":
+                            if choice == "reject":
                                 save_data(data_json_path, "llm_rejected", True, raise_missing=True)
                                 explanation = data[0]
                                 create_file(logs_path / f"llm_rejection.txt", content=explanation)
@@ -234,8 +236,8 @@ def generate_examples(
                             example_index += 1
                             if output.get("require_missing", False):
                                 agent.add_message(
-                                    f"Your example does not include an import statement such as require('{package_name}')."
-                                    f"\nPlease do not use any other name than exactly \"{package_name}\" in the require statement, else we can not proceed."
+                                    f"Your example does not contain an import statement for the package e.g. \"require('{package_name}')\"."
+                                    f"\nAdd an import statement for the package with the exact package name i.e. \"{package_name}\"."
                                 )
                                 continue
                             if output.get("shell_code", 0):
@@ -243,11 +245,13 @@ def generate_examples(
                                     agent.add_message(
                                         f"Running your example with Node did not finish after {EXECUTION_TIMEOUT} seconds:"
                                         f"\n{delimit_code(output["shell_output"], "shell")}"
+                                        f"\nMake the example complete in under {EXECUTION_TIMEOUT} seconds and wait for user inputs."
                                     )
                                     continue
                                 agent.add_message(
                                     f"Running your example with Node failed with code {output["shell_code"]}:"
                                     f"\n{delimit_code(output["shell_output"], "shell")}"
+                                    f"\nFix the error."
                                 )
                                 continue
                             break
