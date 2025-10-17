@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 from typing import Optional
 
-from easy_prompting.prebuilt import GPT, LogList, LogFile, LogFunc, LogReadable, Prompter, IList, IData, ICode, IChoice, IItem, delimit_code, list_text, create_interceptor, pad_text
+from easy_prompting.prebuilt import GPT, LogList, LogFile, LogFunc, LogReadable, Prompter, IList, IText, ICode, IChoice, IItem, delimit_code, list_text, LoggedInteraction, pad_text
 from dts_generation._utils import *
 
 MAX_LENGTH_FILE_PRINTS = 1
@@ -126,10 +126,10 @@ def generate_examples(
             with printer(f"Generating examples with LLM:"):
                 examples_sub_path = examples_path / GENERATION_PATH
                 create_dir(examples_sub_path)
-                model = GPT(llm_model_name, llm_temperature)
-                agent = Prompter(model)
+                lm = GPT(llm_model_name, llm_temperature)
+                agent = Prompter(lm)
                 if llm_interactive:
-                    agent.set_interceptor(create_interceptor(partial(printer, end="")))
+                    agent.set_interaction(LoggedInteraction(partial(printer, end="", flush=True)))
                 if llm_use_cache:
                     agent.set_cache_path(CACHE_PATH / "prompter" / llm_model_name)
                 readable_logger = LogReadable(LogFunc(partial(printer, end="\n\n")))
@@ -188,7 +188,7 @@ def generate_examples(
                             "Do the following",
                             IItem(
                                 "think",
-                                IData(f"Go through each condition step by step and check if it satisfied")
+                                IText(f"Go through each condition step by step and check if it satisfied")
                             ),
                             IItem(
                                 "choose",
@@ -198,7 +198,7 @@ def generate_examples(
                                         f"If at least one of the conditions is satisfied",
                                         IItem(
                                             "satisfied",
-                                            IData(f"Explain which conditions are satisfied")
+                                            IText(f"Explain which conditions are satisfied")
                                         )
                                     ),
                                     IList(
@@ -209,9 +209,9 @@ def generate_examples(
                             )
                         )
                     )[1]
-                    match choice:
-                        case "satisfied":
-                            raise LLMRejectedError(f"LLM rejected the package because of:\n{pad_text(data[0], "  ")}")
+                    match choice, data[0]:
+                        case "satisfied", explanation:
+                            raise LLMRejectedError(f"LLM rejected the package because of:\n{pad_text(explanation, "  ")}")
                 # Generate package examples
                 with LogList(readable_logger, LogFile(logs_path / f"generation.txt")) as logger:
                     generation_agent = agent.get_copy()
@@ -276,7 +276,7 @@ def generate_examples(
                                         "Do the following",
                                         IItem(
                                             "think",
-                                            IData(f"Go through each requirement step by step and think about how you are going to satisfy it")
+                                            IText(f"Go through each requirement step by step and think about how you are going to satisfy it")
                                         ),
                                         IItem(
                                             "example",

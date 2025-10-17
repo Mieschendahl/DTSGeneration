@@ -2,10 +2,10 @@
 name = "dts_generation"
 version = "1.0.0"
 description = "A Python project for generating and comparing TypeScript .d.ts files for NPM packages."
-authors = [{name = "Leonardo Mieschendahl", email = "miesschendahl.leonardo@gmail.com"}]
+authors = [{name = "Leonardo Mieschendahl"}]
 dependencies = [
     "openai == 1.106.0",
-    "easy_prompting @ git+https://github.com/Mieschendahl/EasyPrompting.git@v2.2.0"
+    "easy_prompting @ git+https://github.com/Mieschendahl/EasyPrompting.git@v3.1.1"
 ]
 
 [build-system]
