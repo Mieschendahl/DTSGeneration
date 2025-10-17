@@ -112,9 +112,9 @@ def generate_examples(
                 create_dir(examples_sub_path)
                 examples = re.findall( r"```.*?\n(.*?)```", readme, flags=re.DOTALL)
                 examples = [example.strip() for example in examples]
-                with printer(f"Found {len(examples)} example(s):"):
-                    for example_index, example in enumerate(examples):
-                        run_example(example, examples_sub_path / f"{example_index}.js")
+                printer(f"Found {len(examples)} example(s)")
+                for example_index, example in enumerate(examples):
+                    run_example(example, examples_sub_path / f"{example_index}.js")
             if combine_examples:
                 with printer("Combining extracted examples:"):
                     combined_examples_sub_path = examples_path / COMBINED_EXTRACTION_PATH

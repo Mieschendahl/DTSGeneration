@@ -125,90 +125,91 @@ def evaluate(
                                 except (KeyboardInterrupt, EOFError):
                                     printer(" User aborted")
                                     exit(0)
-                sub_metrics: dict = dict(
-                    sound = 0,
-                    complete = 0,
-                    equivalent = 0,
-                    examples_generated = 0,
-                    declarations_generated = 0,
-                    comparisons_generated = 0
-                )
-                packages = get_children(evaluation_path / PACKAGES_PATH)
-                metrics: dict = dict(
-                    total = len(packages),
-                    usable = 0,
-                    package_data_missing = 0,
-                    package_installation_failed = 0,
-                    commonjs_unsupported = 0,
-                    unexpected_exception = 0,
-                    llm_rejected = 0,
-                    has_repository = 0,
-                    has_package_json = 0,
-                    has_readme = 0,
-                    has_main = 0,
-                    has_tests = 0,
-                    combined_extraction = sub_metrics.copy(),
-                    combined_generation = sub_metrics.copy(),
-                    combined_all = sub_metrics.copy()
-                )
-                for generation_path in packages:
-                    data_json_path = generation_path / DATA_JSON_PATH
-                    metrics["usable"] += load_data(data_json_path, "usable")
-                    metrics["package_data_missing"] += load_data(data_json_path, "package_data_missing")
-                    metrics["package_installation_failed"] +=  load_data(data_json_path, "package_installation_failed")
-                    metrics["commonjs_unsupported"] += load_data(data_json_path, "commonjs_unsupported")
-                    metrics["unexpected_exception"] += load_data(data_json_path, "unexpected_exception")
-                    metrics["llm_rejected"] += load_data(data_json_path, "llm_rejected")
-                    metrics["has_repository"] += load_data(data_json_path, "has_repository")
-                    metrics["has_package_json"] += load_data(data_json_path, "has_package_json")
-                    metrics["has_readme"] += load_data(data_json_path, "has_readme")
-                    metrics["has_main"] += load_data(data_json_path, "has_main")
-                    metrics["has_tests"] += load_data(data_json_path, "has_tests")
+                with printer("Computing metrics:"):
+                    sub_metrics: dict = dict(
+                        sound = 0,
+                        complete = 0,
+                        equivalent = 0,
+                        examples_generated = 0,
+                        declarations_generated = 0,
+                        comparisons_generated = 0
+                    )
+                    packages = get_children(evaluation_path / PACKAGES_PATH)
+                    metrics: dict = dict(
+                        total = len(packages),
+                        usable = 0,
+                        package_data_missing = 0,
+                        package_installation_failed = 0,
+                        commonjs_unsupported = 0,
+                        unexpected_exception = 0,
+                        llm_rejected = 0,
+                        has_repository = 0,
+                        has_package_json = 0,
+                        has_readme = 0,
+                        has_main = 0,
+                        has_tests = 0,
+                        combined_extraction = sub_metrics.copy(),
+                        combined_generation = sub_metrics.copy(),
+                        combined_all = sub_metrics.copy()
+                    )
+                    for generation_path in packages:
+                        data_json_path = generation_path / DATA_JSON_PATH
+                        metrics["usable"] += load_data(data_json_path, "usable")
+                        metrics["package_data_missing"] += load_data(data_json_path, "package_data_missing")
+                        metrics["package_installation_failed"] +=  load_data(data_json_path, "package_installation_failed")
+                        metrics["commonjs_unsupported"] += load_data(data_json_path, "commonjs_unsupported")
+                        metrics["unexpected_exception"] += load_data(data_json_path, "unexpected_exception")
+                        metrics["llm_rejected"] += load_data(data_json_path, "llm_rejected")
+                        metrics["has_repository"] += load_data(data_json_path, "has_repository")
+                        metrics["has_package_json"] += load_data(data_json_path, "has_package_json")
+                        metrics["has_readme"] += load_data(data_json_path, "has_readme")
+                        metrics["has_main"] += load_data(data_json_path, "has_main")
+                        metrics["has_tests"] += load_data(data_json_path, "has_tests")
+                        for mode in COMBINED_MODE_PATHS:
+                            sub_metrics = metrics[mode.name]
+                            sub_metrics["examples_generated"] += not dir_empty(generation_path / EXAMPLES_PATH / mode)
+                            sub_metrics["declarations_generated"] += not dir_empty(generation_path / DECLARATIONS_PATH / mode)
+                            sub_metrics["comparisons_generated"] += not dir_empty(generation_path / COMPARISONS_PATH / mode)
+                            children = get_children(generation_path / COMPARISONS_PATH / mode)
+                            assert len(children) <= 1, "Expected not more than one comparison file for combined examples"
+                            for comparison_path in children:
+                                comparison_json = json.loads(comparison_path.read_text())
+                                sub_metrics["sound"] += comparison_json["isSound"]
+                                sub_metrics["complete"] += comparison_json["isComplete"]
+                                sub_metrics["equivalent"] += comparison_json["isEquivalent"]
+                    metrics_path = evaluation_path / "metrics"
+                    create_dir(metrics_path)
+                    metrics_json = json.dumps(metrics, indent=2, ensure_ascii=False)
+                    create_file(metrics_path / "absolute_metrics.json", content=metrics_json)
+                    if verbose_statistics:
+                        with printer(f"Absolute metrics:"):
+                            printer(metrics_json)
+                    # Compared to usable
+                    relative_metrics: dict = dict(
+                        combined_extraction = sub_metrics.copy(),
+                        combined_generation = sub_metrics.copy(),
+                        combined_all = sub_metrics.copy()
+                    )
                     for mode in COMBINED_MODE_PATHS:
-                        sub_metrics = metrics[mode.name]
-                        sub_metrics["examples_generated"] += not dir_empty(generation_path / EXAMPLES_PATH / mode)
-                        sub_metrics["declarations_generated"] += not dir_empty(generation_path / DECLARATIONS_PATH / mode)
-                        sub_metrics["comparisons_generated"] += not dir_empty(generation_path / COMPARISONS_PATH / mode)
-                        children = get_children(generation_path / COMPARISONS_PATH / mode)
-                        assert len(children) <= 1, "Expected not more than one comparison file for combined examples"
-                        for comparison_path in children:
-                            comparison_json = json.loads(comparison_path.read_text())
-                            sub_metrics["sound"] += comparison_json["isSound"]
-                            sub_metrics["complete"] += comparison_json["isComplete"]
-                            sub_metrics["equivalent"] += comparison_json["isEquivalent"]
-                metrics_path = evaluation_path / "metrics"
-                create_dir(metrics_path)
-                metrics_json = json.dumps(metrics, indent=2, ensure_ascii=False)
-                create_file(metrics_path / "absolute_metrics.json", content=metrics_json)
-                if verbose_statistics:
-                    with printer(f"Absolute metrics:"):
-                        printer(metrics_json)
-                # Compared to usable
-                relative_metrics: dict = dict(
-                    combined_extraction = sub_metrics.copy(),
-                    combined_generation = sub_metrics.copy(),
-                    combined_all = sub_metrics.copy()
-                )
-                for mode in COMBINED_MODE_PATHS:
-                    for metric, old_value in metrics[mode.name].items():
-                        old_value = old_value / metrics["usable"] if metrics["usable"] > 0 else 1
-                        relative_metrics[mode.name][metric] = f"{old_value:.2%}" # type:ignore
-                relative_metrics_json = json.dumps(relative_metrics, indent=2, ensure_ascii=False)
-                create_file(metrics_path / "realtive_metrics.json", content=relative_metrics_json)
-                if verbose_statistics:
-                    with printer(f"Relative metrics:"):
-                        printer(relative_metrics_json)
-                # Compared to combined_extraction
-                base_line_metrics: dict = dict(
-                    combined_generation = sub_metrics.copy(),
-                    combined_all = sub_metrics.copy()
-                )
-                for mode in COMBINED_MODE_PATHS[1:]:
-                    for metric, old_value in metrics["combined_extraction"].items():
-                        old_value = (metrics[mode.name][metric] - old_value) / old_value if old_value > 0 else float("inf")
-                        base_line_metrics[mode.name][metric] = f"{old_value:.2%}" # type:ignore
-                base_line_metrics_json = json.dumps(base_line_metrics, indent=2, ensure_ascii=False)
-                create_file(metrics_path/ "base_line_metrics.json", content=base_line_metrics_json)
-                if verbose_statistics:
-                    with printer(f"Base line metrics:"):
-                        printer(base_line_metrics_json)
+                        for metric, old_value in metrics[mode.name].items():
+                            old_value = old_value / metrics["usable"] if metrics["usable"] > 0 else 1
+                            relative_metrics[mode.name][metric] = f"{old_value:.2%}" # type:ignore
+                    relative_metrics_json = json.dumps(relative_metrics, indent=2, ensure_ascii=False)
+                    create_file(metrics_path / "realtive_metrics.json", content=relative_metrics_json)
+                    if verbose_statistics:
+                        with printer(f"Relative metrics:"):
+                            printer(relative_metrics_json)
+                    # Compared to combined_extraction
+                    base_line_metrics: dict = dict(
+                        combined_generation = sub_metrics.copy(),
+                        combined_all = sub_metrics.copy()
+                    )
+                    for mode in COMBINED_MODE_PATHS[1:]:
+                        for metric, old_value in metrics["combined_extraction"].items():
+                            old_value = (metrics[mode.name][metric] - old_value) / old_value if old_value > 0 else float("inf")
+                            base_line_metrics[mode.name][metric] = f"{old_value:.2%}" # type:ignore
+                    base_line_metrics_json = json.dumps(base_line_metrics, indent=2, ensure_ascii=False)
+                    create_file(metrics_path/ "base_line_metrics.json", content=base_line_metrics_json)
+                    if verbose_statistics:
+                        with printer(f"Base line metrics:"):
+                            printer(base_line_metrics_json)
