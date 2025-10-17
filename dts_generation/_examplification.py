@@ -7,7 +7,7 @@ from typing import Optional
 from easy_prompting.prebuilt import GPT, LogList, LogFile, LogFunc, LogReadable, Prompter, IList, IData, ICode, IChoice, IItem, delimit_code, list_text, create_interceptor, pad_text
 from dts_generation._utils import *
 
-MAX_LENGTH_FILE_PRINTS = 3
+MAX_LENGTH_FILE_PRINTS = 1
 MAX_LENGTH_FILE_PROMPTS = 10000
 MAX_NUM_TEST_FILES = 3
 MAX_NUM_GENERATION_ATTEMPTS = 3
@@ -150,10 +150,10 @@ def generate_examples(
                     )
                     evaluation_agent.add_message(
                         f"Check if the npm package \"{package_name}\" satisfied at least one of the following conditions" + list_text(
-                            f"It is designed to be exclusively used in the browser",
-                            f"It is dependent on a framework",
-                            f"It requires additional npm packages to be installed to be used properly",
-                            f"It is not ment to be directly used in Node",
+                            f"It can only be used in the browser",
+                            f"It can only be used with a framework",
+                            f"It can not directly be used in Node",
+                            f"Running \"npm install {package_name}\" is not enough to properly use",
                             add_scope=True
                         )
                     )
@@ -230,9 +230,10 @@ def generate_examples(
                         list_text(
                             f"Your task is to create an example for the npm package \"{package_name}\" with the following requirements " + list_text(
                                 f"It should import the package using CommonJS style imports",
-                                f"It should use all functionality that the package has to offer",
-                                f"It should execute without errors",
+                                f"It should use as much functionality of the package as is possible",
                                 f"It should not require user inputs",
+                                f"It should execute in Node without errors",
+                                f"It should execute with only \"{package_name}\" installed",
                                 add_scope=True
                             )
                         )

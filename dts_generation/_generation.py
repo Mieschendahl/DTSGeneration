@@ -108,6 +108,6 @@ def generate(
                     save_data(data_json_path, "unexpected_exception", True, raise_missing=True)
                     raise
                 finally:
-                    printer(f"Finished generation for \"{package_name}\":")
+                    printer(f"Finished generation for \"{package_name}\"")
                     if remove_cache:
                         shutil.rmtree(generation_path / "cache", ignore_errors=True)
