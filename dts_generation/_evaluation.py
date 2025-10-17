@@ -19,7 +19,7 @@ def evaluate(
     verbose_setup: bool = False,
     verbose_execution: bool = False,
     verbose_files: bool = False,
-    interactive_exceptions: bool = True,
+    verbose_exceptions: bool = True,
     verbose_statistics: bool = False,
     remove_cache: bool = True,
     extract_from_readme: bool = True,
@@ -113,11 +113,13 @@ def evaluate(
                                 reproduce=reproduce,
                                 overwrite=overwrite
                             )
-                        except (CommonJSUnsupportedError, PackageDataMissingError, PackageInstallationError):
-                            pass
+                        except (CommonJSUnsupportedError, PackageDataMissingError, PackageInstallationError, LLMRejectedError) as e:
+                            if verbose_exceptions:
+                                with printer(f"Catched an expected exception:"):
+                                    printer(str(e))
                         except Exception as e:
-                            if interactive_exceptions:
-                                with printer(f"Encountered an unexpected exception:"):
+                            if verbose_exceptions:
+                                with printer(f"Catched an unexpected exception:"):
                                     printer(traceback.format_exc(), end="")
                                 try:
                                     printer("Waiting for user input: ", end="")
@@ -185,20 +187,20 @@ def evaluate(
                         with printer(f"Absolute metrics:"):
                             printer(metrics_json)
                     # # Compared to usable
-                    # relative_metrics: dict = dict(
-                    #     combined_extraction = sub_metrics.copy(),
-                    #     combined_generation = sub_metrics.copy(),
-                    #     combined_all = sub_metrics.copy()
-                    # )
-                    # for mode in COMBINED_MODE_PATHS:
-                    #     for metric, old_value in metrics[mode.name].items():
-                    #         old_value = old_value / metrics["usable"] if metrics["usable"] > 0 else 1
-                    #         relative_metrics[mode.name][metric] = f"{old_value:.2%}" # type:ignore
-                    # relative_metrics_json = json.dumps(relative_metrics, indent=2, ensure_ascii=False)
-                    # create_file(metrics_path / "realtive_metrics.json", content=relative_metrics_json)
-                    # if verbose_statistics:
-                    #     with printer(f"Relative metrics:"):
-                    #         printer(relative_metrics_json)
+                    relative_metrics: dict = dict(
+                        combined_extraction = sub_metrics.copy(),
+                        combined_generation = sub_metrics.copy(),
+                        combined_all = sub_metrics.copy()
+                    )
+                    for mode in COMBINED_MODE_PATHS:
+                        for metric, old_value in metrics[mode.name].items():
+                            old_value = old_value / metrics["usable"] if metrics["usable"] > 0 else 1
+                            relative_metrics[mode.name][metric] = f"{old_value:.2%}" # type:ignore
+                    relative_metrics_json = json.dumps(relative_metrics, indent=2, ensure_ascii=False)
+                    create_file(metrics_path / "realtive_metrics.json", content=relative_metrics_json)
+                    if verbose_statistics:
+                        with printer(f"Relative metrics:"):
+                            printer(relative_metrics_json)
                     # Compared to combined_extraction
                     base_line_metrics: dict = dict(
                         combined_generation = sub_metrics.copy(),

@@ -43,3 +43,6 @@ class PackageInstallationError(Exception):
 
 class CommonJSUnsupportedError(Exception):
     pass
+
+class LLMRejectedError(Exception):
+    pass

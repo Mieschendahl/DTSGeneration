@@ -14,7 +14,7 @@ if True:
         verbose_setup=True,
         verbose_execution=False,
         verbose_files=False,
-        interactive_exceptions=True,
+        verbose_exceptions=True,
         verbose_statistics=True,
         remove_cache=True,
         extract_from_readme=True,

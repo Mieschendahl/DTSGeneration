@@ -45,6 +45,7 @@ def generate(
     save_data(data_json_path, "package_installation_failed", False)
     save_data(data_json_path, "commonjs_unsupported", False)
     save_data(data_json_path, "unexpected_exception", False)
+    save_data(data_json_path, "llm_rejected_error", False)
     with open(generation_path / LOGS_PATH / "shell.txt", "w") as log_file:
         with printer.with_file(log_file):
             with printer(f"Starting generation for \"{package_name}\":"):
@@ -99,6 +100,9 @@ def generate(
                     raise
                 except CommonJSUnsupportedError:
                     save_data(data_json_path, "commonjs_unsupported", True, raise_missing=True)
+                    raise
+                except LLMRejectedError:
+                    save_data(data_json_path, "llm_rejected", True, raise_missing=True)
                     raise
                 except Exception:
                     save_data(data_json_path, "unexpected_exception", True, raise_missing=True)

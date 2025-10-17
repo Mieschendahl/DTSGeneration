@@ -126,36 +126,113 @@ def generate_examples(
             with printer(f"Generating examples with LLM:"):
                 examples_sub_path = examples_path / GENERATION_PATH
                 create_dir(examples_sub_path)
+                model = GPT(llm_model_name, llm_temperature)
+                agent = Prompter(model)
+                if llm_interactive:
+                    agent.set_interceptor(create_interceptor(partial(printer, end="")))
+                if llm_use_cache:
+                    agent.set_cache_path(CACHE_PATH / "prompter" / llm_model_name)
                 readable_logger = LogReadable(LogFunc(partial(printer, end="\n\n")))
                 readable_logger.set_verbose(llm_verbose)
-                file_logger = LogFile(logs_path / f"{GENERATION_PATH.name}.txt")
-                with LogList(readable_logger, file_logger) as logger:
-                    model = GPT(llm_model_name, llm_temperature)
-                    agent = Prompter(model)
-                    agent.set_logger(logger)
-                    if llm_interactive:
-                        agent.set_interceptor(create_interceptor(partial(printer, end="")))
-                    if llm_use_cache:
-                        agent.set_cache_path(CACHE_PATH / "prompter" / llm_model_name)
-                    agent.set_tag(GENERATION_PATH.name)
-                    agent.add_message(
+                # Evaluate usability of package
+                with LogList(readable_logger, LogFile(logs_path / f"evaluation.txt")) as logger:
+                    evaluation_agent = agent.get_copy()
+                    evaluation_agent.set_logger(logger)
+                    evaluation_agent.set_tag("evaluation")
+                    evaluation_agent.add_message(
                         list_text(
-                            f"You are an autonomous agent and JavaScript/Node/NPM expert.",
-                            f"The user is a program that can only interact with you in predetermined ways.",
-                            f"The user will give you a task and instructions on how to complete the task.",
-                            f"You should try to achieve the task by following the instructions of the user."
+                            f"You are an autonomous agent and JavaScript/Node/NPM expert",
+                            f"The user is a program that can only interact with you in predetermined ways",
+                            f"The user will give you a task and instructions on how to complete the task",
+                            f"You should try to achieve the task by following the instructions of the user"
                         ),
                         role="developer"
                     )
-                    agent.add_message(
+                    evaluation_agent.add_message(
+                        f"Check if the npm package \"{package_name}\" satisfied at least one of the following conditions" + list_text(
+                            f"It is designed to be exclusively used in the browser",
+                            f"It is dependent on a framework",
+                            f"It requires additional npm packages to be installed to be used properly",
+                            f"It is not ment to be directly used in Node",
+                            add_scope=True
+                        )
+                    )
+                    # Crop long messages for print readability
+                    readable_logger.set_crop(MAX_LENGTH_FILE_PRINTS)
+                    if readme:
+                        evaluation_agent.add_message(
+                            f"Here is the readme file of the package's GitHub repository:"
+                            f"\n{delimit_code(readme[:MAX_LENGTH_FILE_PROMPTS], "markdown")}"
+                        )
+                    if package_json:
+                        evaluation_agent.add_message(
+                            f"Here is the package.json file of the package's GitHub repository:"
+                            f"\n{delimit_code(package_json[:MAX_LENGTH_FILE_PROMPTS], "json")}"
+                        )
+                    if main:
+                        evaluation_agent.add_message(
+                            f"Here is the main file of the package's GitHub repository:"
+                            f"\n{delimit_code(main[:MAX_LENGTH_FILE_PROMPTS], "javascript")}"
+                        )
+                    if tests:
+                        evaluation_agent.add_message(
+                            f"Here are some test files of the package's GitHub repository:"
+                            f"\n{
+                                "\n".join(f"{path}:\n{delimit_code(content[:MAX_LENGTH_FILE_PROMPTS], "javascript")}"
+                                for path, content in tests[:MAX_NUM_TEST_FILES])
+                            }"
+                        )
+                    readable_logger.set_crop()
+                    (choice, data) = evaluation_agent.get_data(
+                        IList(
+                            "Do the following",
+                            IItem(
+                                "think",
+                                IData(f"Go through each condition step by step and check if it satisfied")
+                            ),
+                            IItem(
+                                "choose",
+                                IChoice(
+                                    f"Choose one of the following options",
+                                    IList(
+                                        f"If at least one of the conditions is satisfied",
+                                        IItem(
+                                            "satisfied",
+                                            IData(f"Explain which conditions are satisfied")
+                                        )
+                                    ),
+                                    IList(
+                                        f"Otherwise",
+                                        IItem("unsatisfied")
+                                    )
+                                )
+                            )
+                        )
+                    )[1]
+                    match choice:
+                        case "satisfied":
+                            raise LLMRejectedError(f"LLM rejected the package: {data[0]}")
+                # Generate package examples
+                with LogList(readable_logger, LogFile(logs_path / f"generation.txt")) as logger:
+                    generation_agent = agent.get_copy()
+                    generation_agent.set_logger(logger)
+                    generation_agent.set_tag("generation")
+                    generation_agent.add_message(
                         list_text(
-                            f"Your task is to create an example that correctly imports and uses the npm package \"{package_name}\".",
-                            f"The example should"
-                            +
-                            list_text(
-                                f"Cover all possible valid use cases such that I can use the example to infer the type declarations of the package.",
-                                f"Use CommonJS imports and exports.",
-                                f"Does not wait for user inputs and does not run indefinitely e.g. if it runs a server.",
+                            f"You are an autonomous agent and JavaScript/Node/NPM expert",
+                            f"The user is a program that can only interact with you in predetermined ways",
+                            f"The user will give you a task and instructions on how to complete the task",
+                            f"You should try to achieve the task by following the instructions of the user"
+                        ),
+                        role="developer"
+                    )
+                    generation_agent.add_message(
+                        list_text(
+                            f"Your task is to create an example for the npm package \"{package_name}\" with the following requirements " + list_text(
+                                f"It should import the package using CommonJS style imports",
+                                f"It should use all functionality that the package has to offer",
+                                f"It should execute without errors",
+                                f"It should not require user inputs",
                                 add_scope=True
                             )
                         )
@@ -163,22 +240,22 @@ def generate_examples(
                     # Crop long messages for print readability
                     readable_logger.set_crop(MAX_LENGTH_FILE_PRINTS)
                     if readme:
-                        agent.add_message(
+                        generation_agent.add_message(
                             f"Here is the readme file of the package's GitHub repository:"
                             f"\n{delimit_code(readme[:MAX_LENGTH_FILE_PROMPTS], "markdown")}"
                         )
                     if package_json:
-                        agent.add_message(
+                        generation_agent.add_message(
                             f"Here is the package.json file of the package's GitHub repository:"
                             f"\n{delimit_code(package_json[:MAX_LENGTH_FILE_PROMPTS], "json")}"
                         )
                     if main:
-                        agent.add_message(
+                        generation_agent.add_message(
                             f"Here is the main file of the package's GitHub repository:"
                             f"\n{delimit_code(main[:MAX_LENGTH_FILE_PROMPTS], "javascript")}"
                         )
                     if tests:
-                        agent.add_message(
+                        generation_agent.add_message(
                             f"Here are some test files of the package's GitHub repository:"
                             f"\n{
                                 "\n".join(f"{path}:\n{delimit_code(content[:MAX_LENGTH_FILE_PROMPTS], "javascript")}"
@@ -193,62 +270,39 @@ def generate_examples(
                             if example_index >= MAX_NUM_GENERATION_ATTEMPTS:
                                 printer(f"Failed (too many attempts)")
                                 return None
-                            (choice, data) = agent.get_data(
+                            example = generation_agent.get_data(
                                     IList(
                                         "Do the following",
                                         IItem(
                                             "think",
-                                            IData(f"Think about how to complete the current task given by the user.")
+                                            IData(f"Go through each requirement step by step and think about how you are going to satisfy it")
                                         ),
                                         IItem(
-                                            "choose",
-                                            IChoice(
-                                                f"Choose one of the following options",
-                                                IList(
-                                                    f"If the package is not ment to be used as a stand alone package in Node e.g."
-                                                    f"\nbecause it is browser-exclusive, framework-dependent, or requires additional npm packages to be installed.",
-                                                    IItem(
-                                                        "reject",
-                                                        IData(f"Explain why this is the case")
-                                                    )
-                                                ),
-                                                IList(
-                                                    f"Otherwise",
-                                                    IItem(
-                                                        "example",
-                                                        ICode(f"Provide the content of an example.", "javascript")
-                                                    )
-                                                )
-                                            )
-                                        )
+                                            "example",
+                                            ICode(f"Provide the content of the example", "javascript")
+                                        ),
+                                        effect=f"I will check if the example satisfies the requirements"
                                     )
                                 )[1]
-                            if choice == "reject":
-                                save_data(data_json_path, "llm_rejected", True, raise_missing=True)
-                                explanation = data[0]
-                                create_file(logs_path / f"llm_rejection.txt", content=explanation)
-                                printer(f"Fail (LLM rejected package)")
-                                return None
-                            example = data[0]
                             printer(f"Success")
                         with printer(f"Checking example {example_index}:"):
                             output = run_example(example, examples_sub_path / f"{example_index}.js")
                             example_index += 1
                             if output.get("require_missing", False):
-                                agent.add_message(
+                                generation_agent.add_message(
                                     f"Your example does not contain an import statement for the package e.g. \"require('{package_name}')\"."
                                     f"\nAdd an import statement for the package with the exact package name i.e. \"{package_name}\"."
                                 )
                                 continue
                             if output.get("shell_code", 0):
                                 if output.get("shell_timeout", False):
-                                    agent.add_message(
+                                    generation_agent.add_message(
                                         f"Running your example with Node did not finish after {EXECUTION_TIMEOUT} seconds:"
                                         f"\n{delimit_code(output["shell_output"], "shell")}"
                                         f"\nMake the example complete in under {EXECUTION_TIMEOUT} seconds and wait for user inputs."
                                     )
                                     continue
-                                agent.add_message(
+                                generation_agent.add_message(
                                     f"Running your example with Node failed with code {output["shell_code"]}:"
                                     f"\n{delimit_code(output["shell_output"], "shell")}"
                                     f"\nFix the error."
@@ -262,10 +316,11 @@ def generate_examples(
                     combined_example = combine_files_helper(get_children(examples_sub_path))
                     run_example(combined_example, combined_examples_sub_path / "0.js")
 
-        if extract_from_readme:
-            extract_from_readme_helper()
+        # doing generation first, can be faster because of llm rejection
         if generate_with_llm:
             generate_with_llm_helper()
+        if extract_from_readme:
+            extract_from_readme_helper()
         if combine_examples:
             with printer("Combining all examples:"):
                 combined_examples_sub_path = examples_path / COMBINED_ALL_PATH

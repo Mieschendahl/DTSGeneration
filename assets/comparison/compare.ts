@@ -42,11 +42,11 @@ function getRootModuleSymbol(sourceFile: ts.SourceFile, checker: ts.TypeChecker)
   if (fileSymbol) {
     return fileSymbol;
   }
-  for (const stmt of sourceFile.statements) {
-    if (ts.isModuleDeclaration(stmt) && ts.isStringLiteral(stmt.name)) {
-      return checker.getSymbolAtLocation(stmt.name);
-    }
-  }
+  // for (const stmt of sourceFile.statements) {
+  //   if (ts.isModuleDeclaration(stmt) && ts.isStringLiteral(stmt.name)) {
+  //     return checker.getSymbolAtLocation(stmt.name);
+  //   }
+  // }
 }
 
 function main() {
