@@ -30,8 +30,13 @@ def generate_examples(
 ) -> None:
     llm_verbose = llm_verbose or llm_interactive
     with printer(f"Generating examples:"):
-        data_path = generation_path / DATA_PATH
         data_json_path = generation_path / DATA_JSON_PATH
+        save_data(data_json_path, "has_repository", False)
+        save_data(data_json_path, "has_package_json", False)
+        save_data(data_json_path, "has_readme", False)
+        save_data(data_json_path, "has_main", False)      
+        save_data(data_json_path, "has_tests", False)
+        save_data(data_json_path, "llm_rejected", False)
         logs_path = generation_path / LOGS_PATH
         examples_path = generation_path / EXAMPLES_PATH
         template_path = generation_path / TEMPLATE_PATH
@@ -41,12 +46,11 @@ def generate_examples(
         readme = get_readme(generation_path, verbose_setup)
         main = get_main(generation_path, verbose_setup)
         tests = get_tests(generation_path, verbose_setup)
-        save_data(data_json_path, "has_repository", not dir_empty(generation_path / REPOSITORY_PATH))
-        save_data(data_json_path, "has_package_json", file_exists(generation_path / PACKAGE_JSON_PATH))
-        save_data(data_json_path, "has_readme", file_exists(generation_path / README_PATH))
-        save_data(data_json_path, "has_main", file_exists(generation_path / MAIN_PATH))      
-        save_data(data_json_path, "has_tests", not dir_empty(generation_path / TESTS_PATH))
-        save_data(data_json_path, "llm_rejected", False)
+        save_data(data_json_path, "has_repository", not dir_empty(generation_path / REPOSITORY_PATH), raise_missing=True)
+        save_data(data_json_path, "has_package_json", file_exists(generation_path / PACKAGE_JSON_PATH), raise_missing=True)
+        save_data(data_json_path, "has_readme", file_exists(generation_path / README_PATH), raise_missing=True)
+        save_data(data_json_path, "has_main", file_exists(generation_path / MAIN_PATH), raise_missing=True)
+        save_data(data_json_path, "has_tests", not dir_empty(generation_path / TESTS_PATH), raise_missing=True)
         if not readme and not package_json and not main and not tests:
             raise PackageDataMissingError("Not enough package information found")
         build_template_project(package_name, generation_path, verbose_setup, reproduce)
@@ -132,7 +136,7 @@ def generate_examples(
                     if llm_interactive:
                         agent.set_interceptor(create_interceptor(partial(printer, end="")))
                     if llm_use_cache:
-                        agent.set_cache_path(PROMPTER_PATH / llm_model_name)
+                        agent.set_cache_path(CACHE_PATH / "prompter" / llm_model_name)
                     agent.set_tag(GENERATION_PATH.name)
                     agent.add_message(
                         list_text(
@@ -220,7 +224,7 @@ def generate_examples(
                             if choice == "unusable":
                                 save_data(data_json_path, "llm_rejected", True, raise_missing=True)
                                 explanation = data[0]
-                                create_file(logs_path / f"llm_rejected.txt", content=explanation)
+                                create_file(logs_path / f"llm_rejection.txt", content=explanation)
                                 printer(f"Fail (LLM rejected package)")
                                 return None
                             example = data[0]

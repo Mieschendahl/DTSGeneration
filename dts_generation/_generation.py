@@ -1,6 +1,5 @@
 from pathlib import Path
 import shutil
-import traceback
 
 from dts_generation._utils import *
 from dts_generation._examplification import generate_examples as generate_examples_helper

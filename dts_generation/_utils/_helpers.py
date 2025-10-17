@@ -53,7 +53,7 @@ def make_path_name_unique(path: Path) -> Path:
         index += 1
     return path
 
-def load_data(file_path: Path, key: str, default: Any = None, raise_missing: bool = True) -> Any:
+def load_data(file_path: Path, key: str, raise_missing: bool = True, default: Any = None) -> Any:
     data = {}
     if file_path.is_file():
         data = json.loads(file_path.read_text())

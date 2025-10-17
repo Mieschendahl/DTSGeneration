@@ -38,7 +38,7 @@ def evaluate(
             with printer("Starting evaluation:"):
                 with printer.with_verbose(verbose):
                     try:
-                        reproduction: dict = dict(
+                        versions: dict = dict(
                             python = ".".join(map(str, sys.version_info[:3])),
                             node = shell("node --version").value.strip(),
                             npm = shell("npm --version").value.strip(),
@@ -50,24 +50,24 @@ def evaluate(
                         )
                     except ShellError as e:
                         raise ReproductionError("Missing required shell program for evaluation") from e
-                    reproduction_path = evaluation_path / "reproduction" / "reproduction.json"
-                    create_dir(reproduction_path.parent)
+                    versions_path = evaluation_path / "reproduction" / "versions.json"
+                    create_dir(versions_path.parent)
                     if reproduce:
-                        if not reproduction_path.is_file():
-                            raise ReproductionError(f"Missing old reproduction file for version comparison")
-                        saved_reproduction = json.loads(reproduction_path.read_text())
-                        for key, old_value in saved_reproduction.items():
-                            new_value = reproduction[key]
+                        if not versions_path.is_file():
+                            raise ReproductionError(f"Missing old versions file for version comparison")
+                        saved_versions = json.loads(versions_path.read_text())
+                        for key, old_value in saved_versions.items():
+                            new_value = versions[key]
                             if old_value != new_value:
                                 if key not in ["git", "docker"]:
                                     raise ReproductionError(f"Current {key} version is {new_value} which does not match old {key} version {old_value}")
                                 printer(f"Reproduction mode warning: Current {key} version is {new_value} which does not match old {key} version {old_value}")
                     else:
-                        reproduction_json = json.dumps(reproduction, indent=2, ensure_ascii=False)
-                        create_file(reproduction_path, content=reproduction_json)
+                        versions_json = json.dumps(versions, indent=2, ensure_ascii=False)
+                        create_file(versions_path, content=versions_json)
                         if verbose_setup:
-                            with printer(f"Reproduction data:"):
-                                printer(reproduction_json)
+                            with printer(f"Version data:"):
+                                printer(versions_json)
                     # Gathering packages to evaluate
                     build_definitely_typed(build_path, verbose_setup, reproduce)
                     package_names = [path.name for path in get_children(build_path / DEFINITELY_TYPED_PATH / "types") if not dir_empty(path)]
@@ -176,7 +176,7 @@ def evaluate(
                             sub_metrics["sound"] += comparison_json["isSound"]
                             sub_metrics["complete"] += comparison_json["isComplete"]
                             sub_metrics["equivalent"] += comparison_json["isEquivalent"]
-                metrics_path = evaluation_path / METRICS_PATH
+                metrics_path = evaluation_path / "metrics"
                 create_dir(metrics_path)
                 metrics_json = json.dumps(metrics, indent=2, ensure_ascii=False)
                 create_file(metrics_path / "absolute_metrics.json", content=metrics_json)
