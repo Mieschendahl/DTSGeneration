@@ -114,9 +114,7 @@ def evaluate(
                                 overwrite=overwrite
                             )
                         except (CommonJSUnsupportedError, PackageDataMissingError, PackageInstallationError, LLMRejectedError) as e:
-                            if verbose_exceptions:
-                                with printer(f"Catched an expected exception:"):
-                                    printer(str(e))
+                            printer(f"Catched generation exception of type: {type(e).__name__}")
                         except Exception as e:
                             if verbose_exceptions:
                                 with printer(f"Catched an unexpected exception:"):

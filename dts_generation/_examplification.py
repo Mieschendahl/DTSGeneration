@@ -211,7 +211,7 @@ def generate_examples(
                     )[1]
                     match choice:
                         case "satisfied":
-                            raise LLMRejectedError(f"LLM rejected the package: {data[0]}")
+                            raise LLMRejectedError(f"LLM rejected the package because of:\n{pad_text(data[0], "  ")}")
                 # Generate package examples
                 with LogList(readable_logger, LogFile(logs_path / f"generation.txt")) as logger:
                     generation_agent = agent.get_copy()
