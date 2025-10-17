@@ -134,9 +134,8 @@ def evaluate(
                         declarations_generated = 0,
                         comparisons_generated = 0
                     )
-                    packages = get_children(evaluation_path / PACKAGES_PATH)
                     metrics: dict = dict(
-                        total = len(packages),
+                        total = len(package_names_subset),
                         usable = 0,
                         package_data_missing = 0,
                         package_installation_failed = 0,
@@ -152,7 +151,8 @@ def evaluate(
                         combined_generation = sub_metrics.copy(),
                         combined_all = sub_metrics.copy()
                     )
-                    for generation_path in packages:
+                    for package_name in package_names_subset:
+                        generation_path = evaluation_path / PACKAGES_PATH / escape_package_name(package_name)
                         data_json_path = generation_path / DATA_JSON_PATH
                         metrics["usable"] += load_data(data_json_path, "usable")
                         metrics["package_data_missing"] += load_data(data_json_path, "package_data_missing")
@@ -184,21 +184,21 @@ def evaluate(
                     if verbose_statistics:
                         with printer(f"Absolute metrics:"):
                             printer(metrics_json)
-                    # Compared to usable
-                    relative_metrics: dict = dict(
-                        combined_extraction = sub_metrics.copy(),
-                        combined_generation = sub_metrics.copy(),
-                        combined_all = sub_metrics.copy()
-                    )
-                    for mode in COMBINED_MODE_PATHS:
-                        for metric, old_value in metrics[mode.name].items():
-                            old_value = old_value / metrics["usable"] if metrics["usable"] > 0 else 1
-                            relative_metrics[mode.name][metric] = f"{old_value:.2%}" # type:ignore
-                    relative_metrics_json = json.dumps(relative_metrics, indent=2, ensure_ascii=False)
-                    create_file(metrics_path / "realtive_metrics.json", content=relative_metrics_json)
-                    if verbose_statistics:
-                        with printer(f"Relative metrics:"):
-                            printer(relative_metrics_json)
+                    # # Compared to usable
+                    # relative_metrics: dict = dict(
+                    #     combined_extraction = sub_metrics.copy(),
+                    #     combined_generation = sub_metrics.copy(),
+                    #     combined_all = sub_metrics.copy()
+                    # )
+                    # for mode in COMBINED_MODE_PATHS:
+                    #     for metric, old_value in metrics[mode.name].items():
+                    #         old_value = old_value / metrics["usable"] if metrics["usable"] > 0 else 1
+                    #         relative_metrics[mode.name][metric] = f"{old_value:.2%}" # type:ignore
+                    # relative_metrics_json = json.dumps(relative_metrics, indent=2, ensure_ascii=False)
+                    # create_file(metrics_path / "realtive_metrics.json", content=relative_metrics_json)
+                    # if verbose_statistics:
+                    #     with printer(f"Relative metrics:"):
+                    #         printer(relative_metrics_json)
                     # Compared to combined_extraction
                     base_line_metrics: dict = dict(
                         combined_generation = sub_metrics.copy(),
