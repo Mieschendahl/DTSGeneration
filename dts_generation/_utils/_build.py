@@ -7,12 +7,11 @@ from dts_generation._utils._shell import ShellError, shell
 from dts_generation._utils._printer import printer
 from dts_generation._utils._shared import CACHE_PATH, DATA_PATH, DECLARATION_SCRIPTS_PATH, TEMPLATE_PATH, PackageDataMissingError, PackageInstallationError, ReproductionError, INSTALLATION_TIMEOUT
 
-BUILD_SUB_PATH = Path("builds")
-RUN_TIME_ANALYZER_PATH = BUILD_SUB_PATH / "run-time-information-analyzer"
-DECLARATION_GENERATOR_PATH = BUILD_SUB_PATH / "ts-declaration-file-generator"
-DEFINITELY_TYPED_PATH = BUILD_SUB_PATH / "DefinitelyTyped"
-NPM_TOOLS_PATH = BUILD_SUB_PATH / "npm-tools"
-TRANSPILE_PATH = BUILD_SUB_PATH / "npm-tools" / "transpile.js"
+RUN_TIME_ANALYZER_PATH = "run-time-information-analyzer"
+DECLARATION_GENERATOR_PATH = "ts-declaration-file-generator"
+DEFINITELY_TYPED_PATH = "DefinitelyTyped"
+NPM_TOOLS_PATH = Path("npm-tools")
+TRANSPILE_PATH = NPM_TOOLS_PATH / "transpile.js"
 REPOSITORY_PATH = CACHE_PATH / "repository"
 PACKAGE_JSON_PATH = DATA_PATH / "package.json"
 README_PATH = DATA_PATH / "README.md"

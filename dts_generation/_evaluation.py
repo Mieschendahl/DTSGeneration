@@ -13,14 +13,14 @@ def evaluate(
     evaluation_path: Path,
     build_path: Path,
     start: int = 0,
-    length: Optional[int] = None,
+    length: Optional[int] = 100,
     random_seed: Optional[int] = 42,
     verbose: bool = True,
-    verbose_setup: bool = False,
+    verbose_setup: bool = True,
     verbose_execution: bool = False,
     verbose_files: bool = False,
     verbose_exceptions: bool = True,
-    verbose_statistics: bool = False,
+    verbose_statistics: bool = True,
     remove_cache: bool = True,
     extract_from_readme: bool = True,
     generate_with_llm: bool = True,
@@ -28,7 +28,7 @@ def evaluate(
     overwrite: bool = False,
     llm_model_name: str = "gpt-4o-mini",
     llm_temperature: int = 0,
-    llm_verbose: bool = False,
+    llm_verbose: bool = True,
     llm_interactive: bool = False
 ) -> None:
     logs_path = evaluation_path / "logs"

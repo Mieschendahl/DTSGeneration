@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 from typing import Optional
 
-from easy_prompting.prebuilt import GPT, LogList, LogFile, LogFunc, LogReadable, Prompter, IList, IText, ICode, IChoice, IItem, delimit_code, list_text, LoggedInteraction, pad_text
+from easy_prompting.prebuilt import GPT, ListLogger, FileLogger, FuncLogger, ReadableLogger, Prompter, ListI, TextI, CodeI, ChoiceI, ItemI, delimit_code, list_text, PrintDebugger, pad_text
 from dts_generation._utils import *
 
 MAX_LENGTH_FILE_PRINTS = 1
@@ -129,19 +129,19 @@ def generate_examples(
                 lm = GPT(llm_model_name, llm_temperature)
                 agent = Prompter(lm)
                 if llm_interactive:
-                    agent.set_interaction(LoggedInteraction(partial(printer, end="", flush=True)))
+                    agent.set_debugger(PrintDebugger(partial(printer, end="", flush=True)))
                 if llm_use_cache:
-                    agent.set_cache_path(CACHE_PATH / "prompter" / llm_model_name)
-                readable_logger = LogReadable(LogFunc(partial(printer, end="\n\n")))
+                    agent.set_cache(CACHE_PATH / "prompter" / llm_model_name)
+                readable_logger = ReadableLogger(FuncLogger(partial(printer, end="\n\n")))
                 readable_logger.set_verbose(llm_verbose)
                 # Evaluate usability of package
-                with LogList(readable_logger, LogFile(logs_path / f"evaluation.txt")) as logger:
+                with ListLogger(readable_logger, FileLogger(logs_path / f"evaluation.txt")) as logger:
                     evaluation_agent = agent.get_copy()
                     evaluation_agent.set_logger(logger)
                     evaluation_agent.set_tag("evaluation")
                     evaluation_agent.add_message(
                         list_text(
-                            f"You are an autonomous agent and JavaScript/Node/NPM expert",
+                            f"You are an autonomous agent and JavaScript/Node/npm expert",
                             f"The user is a program that can only interact with you in predetermined ways",
                             f"The user will give you a task and instructions on how to complete the task",
                             f"You should try to achieve the task by following the instructions of the user"
@@ -184,42 +184,42 @@ def generate_examples(
                         )
                     readable_logger.set_crop()
                     (choice, data) = evaluation_agent.get_data(
-                        IList(
+                        ListI(
                             "Do the following",
-                            IItem(
+                            ItemI(
                                 "think",
-                                IText(f"Go through each condition step by step and check if it satisfied")
+                                TextI(f"Go through each condition step by step and check if it satisfied")
                             ),
-                            IItem(
+                            ItemI(
                                 "choose",
-                                IChoice(
+                                ChoiceI(
                                     f"Choose one of the following options",
-                                    IList(
+                                    ListI(
                                         f"If at least one of the conditions is satisfied",
-                                        IItem(
+                                        ItemI(
                                             "satisfied",
-                                            IText(f"Explain which conditions are satisfied")
+                                            TextI(f"Explain which conditions are satisfied")
                                         )
                                     ),
-                                    IList(
+                                    ListI(
                                         f"Otherwise",
-                                        IItem("unsatisfied")
+                                        ItemI("unsatisfied")
                                     )
                                 )
                             )
                         )
                     )[1]
                     match choice, data[0]:
-                        case "satisfied", explanation:
-                            raise LLMRejectedError(f"LLM rejected the package because of:\n{pad_text(explanation, "  ")}")
+                        case "satisfied", _:
+                            raise LLMRejectedError(f"The LLM determined that this package is currently not supported")
                 # Generate package examples
-                with LogList(readable_logger, LogFile(logs_path / f"generation.txt")) as logger:
+                with ListLogger(readable_logger, FileLogger(logs_path / f"generation.txt")) as logger:
                     generation_agent = agent.get_copy()
                     generation_agent.set_logger(logger)
                     generation_agent.set_tag("generation")
                     generation_agent.add_message(
                         list_text(
-                            f"You are an autonomous agent and JavaScript/Node/NPM expert",
+                            f"You are an autonomous agent and JavaScript/Node/npm expert",
                             f"The user is a program that can only interact with you in predetermined ways",
                             f"The user will give you a task and instructions on how to complete the task",
                             f"You should try to achieve the task by following the instructions of the user"
@@ -272,15 +272,15 @@ def generate_examples(
                                 printer(f"Failed (too many attempts)")
                                 return None
                             example = generation_agent.get_data(
-                                    IList(
+                                    ListI(
                                         "Do the following",
-                                        IItem(
+                                        ItemI(
                                             "think",
-                                            IText(f"Go through each requirement step by step and think about how you are going to satisfy it")
+                                            TextI(f"Go through each requirement step by step and think about how you are going to satisfy it")
                                         ),
-                                        IItem(
+                                        ItemI(
                                             "example",
-                                            ICode(f"Provide the content of the example", "javascript")
+                                            CodeI(f"Provide the content of the example", "javascript")
                                         ),
                                         effect=f"I will check if the example satisfies the requirements"
                                     )

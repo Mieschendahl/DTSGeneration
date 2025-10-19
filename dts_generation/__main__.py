@@ -1,17 +1,52 @@
 from pathlib import Path
+import argparse
 
 from dts_generation._generation import generate
 from dts_generation._evaluation import evaluate
 
 if __name__ == "__main__":
-    mode = "evaluate"
-    match mode:
+    parser = argparse.ArgumentParser(
+        prog="dts_generation",
+        description="Run DTS Generation or Evaluation pipeline."
+    )
+    parser.add_argument(
+        "--mode",
+        metavar="MODE",
+        default="generate",
+        help="Which mode to run: (default='generate', 'evaluate')."
+    )
+    parser.add_argument(
+        "--package",
+        type=str,
+        default="abs",
+        metavar="NAME",
+        help="Package name for generation mode (default: 'abs')."
+    )
+    parser.add_argument(
+        "--compare",
+        action="store_true",
+        help="Compare declarations to the ground truth for generation mode."
+    )
+    parser.add_argument(
+        "--start",
+        type=int,
+        default=0,
+        help="Start index for evaluation mode (default: 0)."
+    )
+    parser.add_argument(
+        "--length",
+        type=int,
+        default=100,
+        help="Number of evaluation samples (default: 100)."
+    )
+    args = parser.parse_args()
+    match args.mode:
         case "evaluate":
             evaluate(
                 evaluation_path=Path("output/evaluation"),
-                build_path=Path("output"),
-                start=0,
-                length=3,
+                build_path=Path("output/builds"),
+                start=args.start,
+                length=args.length,
                 random_seed=50,
                 verbose=True,
                 verbose_setup=True,
@@ -30,19 +65,18 @@ if __name__ == "__main__":
                 overwrite=False
             )
         case "generate":
-            package_name = "abs"
             generate(
-                package_name=package_name,
-                generation_path=Path(f"output/generation/{package_name}"),
-                build_path=Path("output"),
+                package_name=args.package,
+                generation_path=Path(f"output/generation/{args.package}"),
+                build_path=Path("output/builds"),
                 remove_cache=False,
                 verbose=True,
                 verbose_setup=True,
-                verbose_execution=True,
+                verbose_execution=False,
                 verbose_files=False,
                 generate_examples=True,
                 generate_declarations=True,
-                generate_comparisons=True,
+                generate_comparisons=args.compare,
                 extract_from_readme=True,
                 generate_with_llm=True,
                 llm_model_name="gpt-4o-mini",
@@ -54,3 +88,6 @@ if __name__ == "__main__":
                 combine_examples=True,
                 combined_only=True
             )
+        case _:
+            print(f"Unknown mode given {args.mode!r}")
+            exit(1)
