@@ -16,4 +16,6 @@ The LLM prompts that where used can be found under `<eval path>/packages/<packag
 
 Note, that the LLM prompts can depend on the file system state, for example Node execution erros can reference file paths. Furthermore, some LLM versions are not stable and can produce different outputs for the same inputs, even with the temperature set to 0.
 
+## Comparison
+
 Evaluation results from previous runs can be found in the repository [DTSGeneration-Evaluation-Results](https://github.com/Mieschendahl/DTSGeneration-Evaluation-Results).

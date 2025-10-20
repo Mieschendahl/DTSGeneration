@@ -19,7 +19,7 @@ python3 -m easy_prompting -h
 
 ## OpenAI
 
-If you want to use the **prebuilt** ChatGPT implementation you will have to get a valid [OpenAI API Key](https://platform.openai.com/api-keys) and set it to the environment variable `OPENAI_API_KEY`.
+To use ChatGPT as the LLM implementation, you will have to get a valid [OpenAI API Key](https://platform.openai.com/api-keys) and set it to the environment variable `OPENAI_API_KEY`.
 
 For example, like this in Linux:
 ```bash
