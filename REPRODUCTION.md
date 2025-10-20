@@ -15,3 +15,5 @@ The npm package version info can be found under `<eval path>/packages/<package n
 The LLM prompts that where used can be found under `<eval path>/packages/<package name>/logs/`.
 
 Note, that the LLM prompts can depend on the file system state, for example Node execution erros can reference file paths. Furthermore, some LLM versions are not stable and can produce different outputs for the same inputs, even with the temperature set to 0.
+
+Evaluation results from previous runs can be found in the repository [DTSGeneration-Evaluation-Results](https://github.com/Mieschendahl/DTSGeneration-Evaluation-Results).
