@@ -7,7 +7,7 @@ python3 -m pip install <path to this project>
 
 If you do not want to clone this project you can also run:
 ```bash
-python3 -m pip install "dts_generation @ git+https://github.com/Mieschendahl/DTSGeneration.git@1.0.0"
+python3 -m pip install "dts_generation @ git+https://github.com/Mieschendahl/DTSGeneration.git"
 ```
 
 After that you can import `easy_prompting` and use it in your code.

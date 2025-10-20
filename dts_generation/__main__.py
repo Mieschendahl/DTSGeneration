@@ -12,8 +12,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mode",
         metavar="MODE",
-        default="generate",
-        help="Which mode to run: (default='generate', 'evaluate')."
+        default="generation",
+        help="Which mode to run: (default='generation', 'evaluation')."
     )
     parser.add_argument(
         "--package",
@@ -41,7 +41,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     match args.mode:
-        case "evaluate":
+        case "evaluation":
             evaluate(
                 evaluation_path=Path("output/evaluation"),
                 build_path=Path("output/builds"),
@@ -63,7 +63,7 @@ if __name__ == "__main__":
                 llm_interactive=False,
                 overwrite=False
             )
-        case "generate":
+        case "generation":
             generate(
                 package_name=args.package,
                 generation_path=Path(f"output/generation/{args.package}"),
