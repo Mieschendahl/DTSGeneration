@@ -22,7 +22,6 @@ def generate(
     generate_with_llm: bool = True,
     combine_examples: bool = True,
     combined_only: bool = True,
-    reproduce: bool = False, # should generally be False, if not used by evaluation in reproduction mode
     overwrite: bool = True,
     llm_model_name: str = "gpt-4o-mini",
     llm_temperature: int = 0,
@@ -61,7 +60,6 @@ def generate(
                                 extract_from_readme=extract_from_readme,
                                 generate_with_llm=generate_with_llm,
                                 combine_examples=combine_examples,
-                                reproduce=reproduce,
                                 llm_model_name=llm_model_name,
                                 llm_temperature=llm_temperature,
                                 llm_verbose=llm_verbose,
@@ -77,8 +75,7 @@ def generate(
                                 verbose_setup=verbose_setup,
                                 verbose_execution=verbose_execution,
                                 verbose_files=verbose_files,
-                                combined_only=combined_only,
-                                reproduce=reproduce
+                                combined_only=combined_only
                             )
                         if generate_comparisons:
                             generate_comparisons_helper(
@@ -89,7 +86,6 @@ def generate(
                                 verbose_execution=verbose_execution,
                                 verbose_files=verbose_files,
                                 combined_only=combined_only,
-                                reproduce=reproduce
                             )
                     save_data(data_json_path, "usable", True, raise_missing=True)
                 except PackageDataMissingError:

@@ -21,7 +21,6 @@ def generate_examples(
     extract_from_readme: bool,
     generate_with_llm: bool,
     combine_examples: bool,
-    reproduce: bool,
     llm_model_name: str,
     llm_temperature: int,
     llm_verbose: bool,
@@ -53,7 +52,7 @@ def generate_examples(
         save_data(data_json_path, "has_tests", not dir_empty(generation_path / TESTS_PATH), raise_missing=True)
         if not readme and not package_json and not main and not tests:
             raise PackageDataMissingError("Not enough package information found")
-        build_template_project(package_name, generation_path, verbose_setup, reproduce)
+        build_template_project(package_name, generation_path, verbose_setup)
 
         # Reusable helper function for example testing
         def run_example(example: Optional[str], example_path: Path) -> dict:

@@ -1,3 +1,4 @@
+import datetime
 import json
 from pathlib import Path
 import random
@@ -24,7 +25,6 @@ def evaluate(
     remove_cache: bool = True,
     extract_from_readme: bool = True,
     generate_with_llm: bool = True,
-    reproduce: bool = False,
     overwrite: bool = False,
     llm_model_name: str = "gpt-4o-mini",
     llm_temperature: int = 0,
@@ -37,39 +37,26 @@ def evaluate(
         with printer.with_file(log_file):
             with printer("Starting evaluation:"):
                 with printer.with_verbose(verbose):
-                    try:
-                        versions: dict = dict(
-                            python = ".".join(map(str, sys.version_info[:3])),
-                            node = shell("node --version").value.strip(),
-                            npm = shell("npm --version").value.strip(),
-                            git = shell("git --version").value.strip(),
-                            docker = shell("docker --version").value.strip(),
-                            llm_model_name = llm_model_name,
-                            llm_temperature = llm_temperature,
-                            random_seed = random_seed
-                        )
-                    except ShellError as e:
-                        raise ReproductionError("Missing required shell program for evaluation") from e
-                    versions_path = evaluation_path / "reproduction" / "versions.json"
-                    create_dir(versions_path.parent)
-                    if reproduce:
-                        if not versions_path.is_file():
-                            raise ReproductionError(f"Missing old versions file for version comparison")
-                        saved_versions = json.loads(versions_path.read_text())
-                        for key, old_value in saved_versions.items():
-                            new_value = versions[key]
-                            if old_value != new_value:
-                                if key not in ["git", "docker"]:
-                                    raise ReproductionError(f"Current {key} version is {new_value} which does not match old {key} version {old_value}")
-                                printer(f"Reproduction mode warning: Current {key} version is {new_value} which does not match old {key} version {old_value}")
-                    else:
-                        versions_json = json.dumps(versions, indent=2, ensure_ascii=False)
-                        create_file(versions_path, content=versions_json)
-                        if verbose_setup:
-                            with printer(f"Version data:"):
-                                printer(versions_json)
-                    # Gathering packages to evaluate
-                    build_definitely_typed(build_path, verbose_setup, reproduce)
+                    build_definitely_typed(build_path, verbose_setup)
+                    # Save version data for reproducability
+                    versions: dict = dict(
+                        date = str(datetime.date.today()),
+                        python = ".".join(map(str, sys.version_info[:3])),
+                        node = shell("node --version").value.strip(),
+                        npm = shell("npm --version").value.strip(),
+                        git = shell("git --version").value.strip(),
+                        docker = shell("docker --version").value.strip(),
+                        llm_model_name = llm_model_name,
+                        llm_temperature = llm_temperature,
+                        random_seed = random_seed,
+                        definitely_typed = shell("git rev-parse HEAD", cwd=build_path / DEFINITELY_TYPED_PATH).value.strip()
+                    )
+                    versions_json = json.dumps(versions, indent=2, ensure_ascii=False)
+                    create_file(evaluation_path / "reproduction" / "info.json", content=versions_json)
+                    if verbose_setup:
+                        with printer(f"Version data:"):
+                            printer(versions_json)
+                    # Sample packages to evaluate
                     package_names = [path.name for path in get_children(build_path / DEFINITELY_TYPED_PATH / "types") if not dir_empty(path)]
                     package_names.sort()
                     # ts-declaration-file-generator currently does not qualified package names (e.g. @babel/core)
@@ -110,7 +97,6 @@ def evaluate(
                                 llm_use_cache=False,
                                 combine_examples=True,
                                 combined_only=True,
-                                reproduce=reproduce,
                                 overwrite=overwrite
                             )
                         except (CommonJSUnsupportedError, PackageDataMissingError, PackageInstallationError, LLMRejectedError) as e:

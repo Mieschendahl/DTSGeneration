@@ -32,9 +32,6 @@ ALL_MODE_PATHS = BASIC_MODE_PATHS + COMBINED_MODE_PATHS
 
 ### Exceptions ###
 
-class ReproductionError(Exception):
-    pass
-
 class PackageDataMissingError(Exception):
     pass
 

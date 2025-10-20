@@ -10,8 +10,7 @@ def generate_declarations(
     verbose_setup: bool,
     verbose_execution: bool,
     verbose_files: bool,
-    combined_only: bool,
-    reproduce: bool
+    combined_only: bool
 ) -> None:
     with printer(f"Generating declarations:"):
         examples_path = generation_path / EXAMPLES_PATH
@@ -22,7 +21,7 @@ def generate_declarations(
         build_run_time_information_gathering(build_path, verbose_setup)
         build_ts_declaration_file_generator(build_path, verbose_setup)
         build_npm_tools(build_path, verbose_setup)
-        build_template_project(package_name, generation_path, verbose_setup, reproduce)
+        build_template_project(package_name, generation_path, verbose_setup)
         for sub_path in (COMBINED_MODE_PATHS if combined_only else ALL_MODE_PATHS):
             examples_sub_path = examples_path / sub_path
             children = get_children(examples_sub_path)

@@ -57,11 +57,10 @@ if __name__ == "__main__":
                 remove_cache=True,
                 extract_from_readme=True,
                 generate_with_llm=True,
-                llm_model_name="gpt-4o-mini",
+                llm_model_name="gpt-4o-mini-2024-07-18",
                 llm_temperature=0,
                 llm_verbose=True,
                 llm_interactive=False,
-                reproduce=False,
                 overwrite=False
             )
         case "generate":
@@ -79,11 +78,10 @@ if __name__ == "__main__":
                 generate_comparisons=args.compare,
                 extract_from_readme=True,
                 generate_with_llm=True,
-                llm_model_name="gpt-4o-mini",
+                llm_model_name="gpt-4o-mini-2024-07-18",
                 llm_temperature=0,
                 llm_verbose=True,
                 llm_interactive=False,
-                reproduce=False,
                 overwrite=True,
                 combine_examples=True,
                 combined_only=True

@@ -26,7 +26,7 @@ generate(package_name, Path("output/generation"), Path("output/builds"))  # gene
 
 ## Reproduction
 
-`REPRODUCE.md` contains all the information to make evaluations as reproducible as possible.
+`REPRODUCTION.md` contains all the information to make evaluations as reproducible as possible.
 
 ## Manual
 

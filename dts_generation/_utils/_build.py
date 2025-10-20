@@ -5,11 +5,11 @@ from typing import Optional
 from dts_generation._utils._helpers import create_dir, create_file, dir_empty, get_children, file_exists
 from dts_generation._utils._shell import ShellError, shell
 from dts_generation._utils._printer import printer
-from dts_generation._utils._shared import CACHE_PATH, DATA_PATH, DECLARATION_SCRIPTS_PATH, TEMPLATE_PATH, PackageDataMissingError, PackageInstallationError, ReproductionError, INSTALLATION_TIMEOUT
+from dts_generation._utils._shared import CACHE_PATH, DATA_PATH, DECLARATION_SCRIPTS_PATH, TEMPLATE_PATH, PackageDataMissingError, PackageInstallationError, INSTALLATION_TIMEOUT
 
-RUN_TIME_ANALYZER_PATH = "run-time-information-analyzer"
-DECLARATION_GENERATOR_PATH = "ts-declaration-file-generator"
-DEFINITELY_TYPED_PATH = "DefinitelyTyped"
+RUN_TIME_ANALYZER_PATH = Path("run-time-information-analyzer")
+DECLARATION_GENERATOR_PATH = Path("ts-declaration-file-generator")
+DEFINITELY_TYPED_PATH = Path("DefinitelyTyped")
 NPM_TOOLS_PATH = Path("npm-tools")
 TRANSPILE_PATH = NPM_TOOLS_PATH / "transpile.js"
 REPOSITORY_PATH = CACHE_PATH / "repository"
@@ -18,7 +18,7 @@ README_PATH = DATA_PATH / "README.md"
 MAIN_PATH = DATA_PATH / "index.js"
 TESTS_PATH = DATA_PATH / "tests"
 
-def build_definitely_typed(build_path: Path, verbose_setup: bool, reproduce: bool) -> None:
+def build_definitely_typed(build_path: Path, verbose_setup: bool) -> None:
     with printer.with_verbose(verbose_setup):
         with printer(f"Cloning the DefinitelyTyped repository:"):
             output_path = build_path / DEFINITELY_TYPED_PATH
@@ -31,14 +31,6 @@ def build_definitely_typed(build_path: Path, verbose_setup: bool, reproduce: boo
                 timeout=INSTALLATION_TIMEOUT,
                 verbose=verbose_setup
             )
-            if reproduce:
-                shell(
-                    # DefinitelyTyped version that the last big evaluation was performed on
-                    f"git checkout 3b48ce35f1236733d9c1940eb95e6647b8a30852",
-                    cwd=output_path,
-                    timeout=INSTALLATION_TIMEOUT,
-                    verbose=verbose_setup
-                )
             printer(f"Success")
 
 # currently not in development, so does not need a reproduction mode
@@ -102,7 +94,7 @@ def build_npm_tools(build_path: Path, verbose_setup: bool) -> None:
             )
             printer(f"Success")
 
-def build_template_project(package_name: str, generation_path: Path, verbose_setup: bool, reproduce: bool):
+def build_template_project(package_name: str, generation_path: Path, verbose_setup: bool):
     with printer.with_verbose(verbose_setup):
         with printer(f"Building template npm project:"):
             output_path = generation_path / TEMPLATE_PATH
@@ -113,16 +105,9 @@ def build_template_project(package_name: str, generation_path: Path, verbose_set
             with printer(f"Installing packages:"):
                 data_path = generation_path / DATA_PATH
                 try:
-                    if reproduce:
-                        if not file_exists(data_path / "package.json") or not file_exists(data_path / "package-lock.json"):
-                            raise ReproductionError("Need package.json and package-lock.json from previous build, to build template project in reproduction mode")
-                        create_file(output_path / "package.json", data_path / "package.json")
-                        create_file(output_path / "package-lock.json", data_path / "package-lock.json")
-                        shell(f"npm ci", cwd=output_path, timeout=INSTALLATION_TIMEOUT, verbose=verbose_setup)
-                    else:
-                        shell(f"npm install tsx typescript @types/node {package_name}", cwd=output_path, timeout=INSTALLATION_TIMEOUT, verbose=verbose_setup)
-                        create_file(data_path / "package.json", output_path / "package.json")
-                        create_file(data_path / "package-lock.json", output_path / "package-lock.json")
+                    shell(f"npm install tsx typescript @types/node {package_name}", cwd=output_path, timeout=INSTALLATION_TIMEOUT, verbose=verbose_setup)
+                    create_file(data_path / "package.json", output_path / "package.json")
+                    create_file(data_path / "package-lock.json", output_path / "package-lock.json")
                     printer(f"Success")
                 except ShellError as e:
                     raise PackageInstallationError(f"Running npm install {package_name} failed") from e

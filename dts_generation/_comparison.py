@@ -10,16 +10,15 @@ def generate_comparisons(
     verbose_setup: bool,
     verbose_execution: bool,
     verbose_files: bool,
-    combined_only: bool,
-    reproduce: bool
+    combined_only: bool
 ) -> None:
     with printer(f"Generating comparisons:"):
         declarations_path = generation_path / DECLARATIONS_PATH
         comparisons_path = generation_path / COMPARISONS_PATH
         template_path = generation_path / TEMPLATE_PATH
         playground_path = generation_path / PLAYGROUND_PATH
-        build_definitely_typed(build_path, verbose_setup, reproduce)
-        build_template_project(package_name, generation_path, verbose_setup, reproduce)
+        build_definitely_typed(build_path, verbose_setup)
+        build_template_project(package_name, generation_path, verbose_setup)
         dt_declaration_path = build_path / DEFINITELY_TYPED_PATH / "types" / escape_package_name(package_name) / "index.d.ts"
         if verbose_files:
             with printer(f"DefinitelyTyped declaration content:"):
