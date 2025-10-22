@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 from typing import Optional
 
-from easy_prompting.prebuilt import GPT, ListLogger, FileLogger, FuncLogger, ReadableLogger, Prompter, ListI, TextI, CodeI, ChoiceI, ItemI, delimit_code, list_text, PrintDebugger, pad_text
+from easy_prompting.prebuilt import GPT, ListLogger, FileLogger, FuncLogger, ReadableLogger, Prompter, ListI, TextI, CodeI, ChoiceI, Item, delimit_code, list_text, PrintDebugger, pad_text
 from dts_generation._utils import *
 
 MAX_LENGTH_FILE_PRINTS = 1
@@ -185,27 +185,28 @@ def generate_examples(
                     (choice, data) = evaluation_agent.get_data(
                         ListI(
                             "Do the following",
-                            ItemI(
+                            Item(
                                 "think",
                                 TextI(f"Go through each condition step by step and check if it satisfied")
                             ),
-                            ItemI(
+                            Item(
                                 "choose",
                                 ChoiceI(
                                     f"Choose one of the following options",
                                     ListI(
                                         f"If at least one of the conditions is satisfied",
-                                        ItemI(
+                                        Item(
                                             "satisfied",
                                             TextI(f"Explain which conditions are satisfied")
                                         )
                                     ),
                                     ListI(
                                         f"Otherwise",
-                                        ItemI("unsatisfied")
+                                        Item("unsatisfied")
                                     )
                                 )
-                            )
+                            ),
+                            add_stop=True
                         )
                     )[1]
                     match choice, data[0]:
@@ -273,15 +274,15 @@ def generate_examples(
                             example = generation_agent.get_data(
                                     ListI(
                                         "Do the following",
-                                        ItemI(
+                                        Item(
                                             "think",
                                             TextI(f"Go through each requirement step by step and think about how you are going to satisfy it")
                                         ),
-                                        ItemI(
+                                        Item(
                                             "example",
                                             CodeI(f"Provide the content of the example", "javascript")
                                         ),
-                                        effect=f"I will check if the example satisfies the requirements"
+                                        add_stop=True
                                     )
                                 )[1]
                             printer(f"Success")
