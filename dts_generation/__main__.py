@@ -1,8 +1,7 @@
 from pathlib import Path
 import argparse
 
-from dts_generation._generation import generate
-from dts_generation._evaluation import evaluate
+from dts_generation import generate, evaluate
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
