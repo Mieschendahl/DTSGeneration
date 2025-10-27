@@ -130,7 +130,7 @@ def generate_examples(
                 if llm_interactive:
                     agent.set_debugger(PrintDebugger(partial(printer, end="", flush=True)))
                 if llm_use_cache:
-                    agent.set_cache(CACHE_PATH / "prompter" / llm_model_name)
+                    agent.set_cache(generation_path / CACHE_PATH / "prompter" / llm_model_name)
                 readable_logger = ReadableLogger(FuncLogger(partial(printer, end="\n\n")))
                 readable_logger.set_verbose(llm_verbose)
                 # Evaluate usability of package
