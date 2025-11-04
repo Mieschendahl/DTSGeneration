@@ -90,12 +90,12 @@ def generate_examples(
 
         # Checking if package supports ES5 syntax
         if check_es5:
-            with printer(f"Checking ES5 support:"):#
+            with printer(f"Checking ES5 support:"):
                 create_dir(playground_path, template_path, overwrite=True)
                 entry_path = playground_path / "entry.js"
-                output = create_file(entry_path, content=f"const package = require(\"{package_name}\");")
+                output = create_file(entry_path, content=f"var package = require(\"{package_name}\");")
                 shell_output = shell(
-                    f"npx esbuild {entry_path.resolve()} --bundle --target=es5 --outfile={entry_path.resolve()}",
+                    f"npx esbuild {entry_path.resolve()} --bundle --target=es5 --platform=node --log-level=error --outfile=/dev/null",
                     cwd=playground_path,
                     check=False,
                     timeout=INSTALLATION_TIMEOUT,
