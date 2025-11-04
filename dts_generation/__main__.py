@@ -22,9 +22,19 @@ if __name__ == "__main__":
         help="Package name for generation mode (default: 'abs')."
     )
     parser.add_argument(
+        "--check-es5",
+        action="store_true",
+        help="Check if packages support es5 syntax."
+    )
+    parser.add_argument(
         "--compare",
         action="store_true",
         help="Compare declarations to the ground truth for generation mode."
+    )
+    parser.add_argument(
+        "--exclude-llm",
+        action="store_true",
+        help="Do not use an LLM to generate use-case examples for a package."
     )
     parser.add_argument(
         "--start",
@@ -55,7 +65,8 @@ if __name__ == "__main__":
                 verbose_statistics=True,
                 remove_cache=True,
                 extract_from_readme=True,
-                generate_with_llm=True,
+                generate_with_llm=not args.exclude_llm,
+                check_es5=args.check_es5,
                 llm_model_name="gpt-4o-mini-2024-07-18",
                 llm_temperature=0,
                 llm_verbose=True,
@@ -76,7 +87,8 @@ if __name__ == "__main__":
                 generate_declarations=True,
                 generate_comparisons=args.compare,
                 extract_from_readme=True,
-                generate_with_llm=True,
+                generate_with_llm=not args.exclude_llm,
+                check_es5=args.check_es5,
                 llm_model_name="gpt-4o-mini-2024-07-18",
                 llm_temperature=0,
                 llm_verbose=True,

@@ -20,6 +20,7 @@ def generate(
     generate_comparisons: bool = False,
     extract_from_readme: bool = True,
     generate_with_llm: bool = True,
+    check_es5: bool = False,
     combine_examples: bool = True,
     combined_only: bool = True,
     overwrite: bool = True,
@@ -42,6 +43,7 @@ def generate(
     save_data(data_json_path, "usable", False)
     save_data(data_json_path, "package_data_missing", False)
     save_data(data_json_path, "package_installation_failed", False)
+    save_data(data_json_path, "es5_unsupported", False)
     save_data(data_json_path, "commonjs_unsupported", False)
     save_data(data_json_path, "unexpected_exception", False)
     save_data(data_json_path, "llm_rejected_error", False)
@@ -54,12 +56,14 @@ def generate(
                             generate_examples_helper(
                                 package_name=package_name,
                                 generation_path=generation_path,
+                                build_path=build_path,
                                 verbose_setup=verbose_setup,
                                 verbose_execution=verbose_execution,
                                 verbose_files=verbose_files,
                                 extract_from_readme=extract_from_readme,
                                 generate_with_llm=generate_with_llm,
                                 combine_examples=combine_examples,
+                                check_es5=check_es5,
                                 llm_model_name=llm_model_name,
                                 llm_temperature=llm_temperature,
                                 llm_verbose=llm_verbose,
@@ -96,6 +100,9 @@ def generate(
                     raise
                 except CommonJSUnsupportedError:
                     save_data(data_json_path, "commonjs_unsupported", True, raise_missing=True)
+                    raise
+                except ES5UnsupportedError:
+                    save_data(data_json_path, "es5_unsupported", True, raise_missing=True)
                     raise
                 except LLMRejectedError:
                     save_data(data_json_path, "llm_rejected", True, raise_missing=True)

@@ -41,5 +41,8 @@ class PackageInstallationError(Exception):
 class CommonJSUnsupportedError(Exception):
     pass
 
+class ES5UnsupportedError(Exception):
+    pass
+
 class LLMRejectedError(Exception):
     pass

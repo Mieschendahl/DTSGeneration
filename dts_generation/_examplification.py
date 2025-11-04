@@ -15,12 +15,14 @@ MAX_NUM_GENERATION_ATTEMPTS = 3
 def generate_examples(
     package_name: str,
     generation_path: Path,
+    build_path: Path,
     verbose_setup: bool,
     verbose_execution: bool,
     verbose_files: bool,
     extract_from_readme: bool,
     generate_with_llm: bool,
     combine_examples: bool,
+    check_es5: bool,
     llm_model_name: str,
     llm_temperature: int,
     llm_verbose: bool,
@@ -53,6 +55,7 @@ def generate_examples(
         if not readme and not package_json and not main and not tests:
             raise PackageDataMissingError("Not enough package information found")
         build_template_project(package_name, generation_path, verbose_setup)
+        build_npm_tools(build_path, verbose_setup)
 
         # Reusable helper function for example testing
         def run_example(example: Optional[str], example_path: Path) -> dict:
@@ -79,8 +82,33 @@ def generate_examples(
                         create_file(example_path, content=example)
                     return dict(shell_code=shell_output.code, shell_output=shell_output.value, shell_timeout=shell_output.timeout)
 
+        # Checking if package is usable
+        with printer(f"Checking CommonJS support:"):
+            output = run_example(f"const package = require(\"{package_name}\");", playground_path / "entry.js")
+            if output.get("shell_code", 0):
+                raise CommonJSUnsupportedError(f"Require statement fails on package with error:\n{pad_text(output["shell_output"])}")
+
+        # Checking if package supports ES5 syntax
+        if check_es5:
+            with printer(f"Checking ES5 support:"):#
+                create_dir(playground_path, template_path, overwrite=True)
+                entry_path = playground_path / "entry.js"
+                output = create_file(entry_path, content=f"const package = require(\"{package_name}\");")
+                shell_output = shell(
+                    f"npx esbuild {entry_path.resolve()} --bundle --target=es5 --outfile={entry_path.resolve()}",
+                    cwd=playground_path,
+                    check=False,
+                    timeout=INSTALLATION_TIMEOUT,
+                    verbose=verbose_execution
+                )
+                if shell_output.code:
+                    printer(f"Fail")
+                    raise ES5UnsupportedError(f"The package or one of its dependencies does not support ES5 syntax")
+                else:
+                    printer(f"Success")
+
         # Reusable helper function for combining examples
-        def combine_files_helper(file_paths: list[Path],) -> Optional[str]:
+        def combine_files_helper(file_paths: list[Path]) -> Optional[str]:
             with printer(f"Combining examples:"):
                 if len(file_paths) == 0:
                     printer(f"No examples found")
@@ -95,12 +123,6 @@ def generate_examples(
                     combined_parts.append(wrapped)
                 printer(f"Success")
                 return "\n\n".join(combined_parts)
-
-        # Checking if package is usable
-        with printer(f"Checking CommonJS support:"):
-            output = run_example(f"const package = require(\"{package_name}\");", playground_path / "test.js")
-            if output.get("shell_code", 0):
-                raise CommonJSUnsupportedError(f"Require statement fails on package with error:\n{pad_text(output["shell_output"])}")
 
         def extract_from_readme_helper() -> None:
             with printer(f"Extracting examples from the readme file:"):

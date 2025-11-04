@@ -25,6 +25,7 @@ def evaluate(
     remove_cache: bool = True,
     extract_from_readme: bool = True,
     generate_with_llm: bool = True,
+    check_es5: bool = False,
     overwrite: bool = False,
     llm_model_name: str = "gpt-4o-mini",
     llm_temperature: int = 0,
@@ -90,6 +91,7 @@ def evaluate(
                                 generate_comparisons=True,
                                 extract_from_readme=extract_from_readme,
                                 generate_with_llm=generate_with_llm,
+                                check_es5=check_es5,
                                 llm_model_name=llm_model_name,
                                 llm_temperature=llm_temperature,
                                 llm_verbose=llm_verbose,
@@ -99,7 +101,7 @@ def evaluate(
                                 combined_only=True,
                                 overwrite=overwrite
                             )
-                        except (CommonJSUnsupportedError, PackageDataMissingError, PackageInstallationError, LLMRejectedError) as e:
+                        except (CommonJSUnsupportedError, ES5UnsupportedError, PackageDataMissingError, PackageInstallationError, LLMRejectedError) as e:
                             printer(f"Catched generation exception of type: {type(e).__name__}")
                         except Exception as e:
                             if verbose_exceptions:
@@ -126,6 +128,7 @@ def evaluate(
                         package_data_missing = 0,
                         package_installation_failed = 0,
                         commonjs_unsupported = 0,
+                        es5_unsupported = 0,
                         unexpected_exception = 0,
                         llm_rejected = 0,
                         has_repository = 0,
@@ -144,6 +147,7 @@ def evaluate(
                         metrics["package_data_missing"] += load_data(data_json_path, "package_data_missing")
                         metrics["package_installation_failed"] +=  load_data(data_json_path, "package_installation_failed")
                         metrics["commonjs_unsupported"] += load_data(data_json_path, "commonjs_unsupported")
+                        metrics["es5_unsupported"] += load_data(data_json_path, "es5_unsupported")
                         metrics["unexpected_exception"] += load_data(data_json_path, "unexpected_exception")
                         metrics["llm_rejected"] += load_data(data_json_path, "llm_rejected")
                         metrics["has_repository"] += load_data(data_json_path, "has_repository")

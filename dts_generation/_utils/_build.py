@@ -86,7 +86,7 @@ def build_npm_tools(build_path: Path, verbose_setup: bool) -> None:
             create_file(output_path / "package-lock.json", DECLARATION_SCRIPTS_PATH / "package-lock.json")
             create_file(output_path / "transpile.js", DECLARATION_SCRIPTS_PATH / "transpile.js")
             shell(
-                # f"npm install @babel/core @babel/preset-env", # dont use this because of reproducability,
+                # f"npm install @babel/core @babel/preset-env esbuild", # dont use this because of reproducability,
                 f"npm ci",
                 cwd=output_path,
                 timeout=INSTALLATION_TIMEOUT,
