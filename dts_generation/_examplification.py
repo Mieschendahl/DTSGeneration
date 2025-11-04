@@ -323,13 +323,13 @@ def generate_examples(
                                 if output.get("shell_timeout", False):
                                     generation_agent.add_message(
                                         f"Running your example with Node did not finish after {EXECUTION_TIMEOUT} seconds:"
-                                        f"\n{delimit_code(output["shell_output"], "shell")}"
+                                        f"\n{delimit_code(output["shell_output"][:MAX_LENGTH_FILE_PROMPTS], "shell")}"
                                         f"\nMake the example complete in under {EXECUTION_TIMEOUT} seconds and wait for user inputs."
                                     )
                                     continue
                                 generation_agent.add_message(
                                     f"Running your example with Node failed with code {output["shell_code"]}:"
-                                    f"\n{delimit_code(output["shell_output"], "shell")}"
+                                    f"\n{delimit_code(output["shell_output"][:MAX_LENGTH_FILE_PROMPTS], "shell")}"
                                     f"\nFix the error."
                                 )
                                 continue
