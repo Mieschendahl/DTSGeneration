@@ -93,9 +93,10 @@ def generate_examples(
             with printer(f"Checking ES5 support:"):
                 create_dir(playground_path, template_path, overwrite=True)
                 entry_path = playground_path / "entry.js"
+                bundle_path = playground_path / "bundle.js"
                 output = create_file(entry_path, content=f"var package = require(\"{package_name}\");")
                 shell_output = shell(
-                    f"npx esbuild {entry_path.resolve()} --bundle --target=es5 --platform=node --log-level=error --outfile=/dev/null",
+                    f"npx esbuild {entry_path.resolve()} --outfile={bundle_path.resolve()} --bundle --target=es5 --platform=node --log-level=error",
                     cwd=playground_path,
                     check=False,
                     timeout=INSTALLATION_TIMEOUT,
@@ -106,6 +107,7 @@ def generate_examples(
                     raise ES5UnsupportedError(f"The package or one of its dependencies does not support ES5 syntax")
                 else:
                     printer(f"Success")
+            exit()
 
         # Reusable helper function for combining examples
         def combine_files_helper(file_paths: list[Path]) -> Optional[str]:
