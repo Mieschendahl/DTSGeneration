@@ -107,7 +107,6 @@ def generate_examples(
                     raise ES5UnsupportedError(f"The package or one of its dependencies does not support ES5 syntax")
                 else:
                     printer(f"Success")
-            exit()
 
         # Reusable helper function for combining examples
         def combine_files_helper(file_paths: list[Path]) -> Optional[str]:
