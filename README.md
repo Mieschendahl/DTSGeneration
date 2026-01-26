@@ -15,7 +15,7 @@ To generate TSD files for an npm package, all you have to do is call the generat
 from pathlib import Path
 from jstypelog import generate
 
-generate(package_name, Path("output/generation"), Path("output/builds"))  # generates declarations in output/generation/declarations
+generate(package_name="abs")  # generates declarations in output/generation/abs/declarations
 ```
 
 `jstypelog/__main__.py` shows how to properly use this package.
